@@ -1,0 +1,132 @@
+version: "2.0"
+
+page_types:
+  concept:
+    required_frontmatter:
+      - title
+      - type
+      - confidence
+      - created
+      - source_refs
+      - content_hash
+    required_sections:
+      - Definition
+      - "Key Properties"
+      - "How It Works"
+      - Relationships
+      - "Open Questions"
+      - Sources
+    section_rules:
+      Definition: facts_only
+      "Key Properties": facts_only
+      "How It Works": mixed
+      Relationships: facts_only
+      "Open Questions": inference_only
+      Sources: required
+    min_outlinks: 2
+    citation_format: "[source: {filename}, §{section}]"
+
+  entity:
+    required_frontmatter:
+      - title
+      - type
+      - entity_type
+      - created
+      - source_refs
+      - content_hash
+    required_sections:
+      - Overview
+      - Contributions
+      - Relationships
+      - Sources
+    min_outlinks: 1
+
+  index:
+    auto_generated: true
+
+  timeline:
+    required_frontmatter:
+      - title
+      - type
+      - created
+
+confidence_levels:
+  HIGH:
+    description: "Multiple independent sources agree"
+    color: green
+  MEDIUM:
+    description: "Single source, well-established claim"
+    color: yellow
+  LOW:
+    description: "Inference, single mention, or contested"
+    color: red
+
+relation_types:
+  - implements
+  - extends
+  - contradicts
+  - cites
+  - prerequisite_of
+  - trades_off
+  - derived_from
+
+extraction:
+  merge_over_create: true
+  atomic_notes: true
+  entity_resolution: true
+  write_mode: diff_proposal
+  source_type_templates:
+    paper:
+      - abstract
+      - methodology
+      - results
+      - limitations
+    article:
+      - summary
+      - key_points
+      - implications
+    transcript:
+      - speakers
+      - topics
+      - decisions
+      - open_items
+    code-doc:
+      - purpose
+      - api
+      - examples
+      - gotchas
+
+validation:
+  broken_links:
+    severity: ERROR
+  orphan_pages:
+    severity: WARNING
+  missing_frontmatter:
+    severity: ERROR
+  invalid_type:
+    severity: ERROR
+  no_sources:
+    severity: WARNING
+  low_connectivity:
+    severity: WARNING
+    min_outlinks: 2
+  unresolved_contradiction:
+    severity: WARNING
+  duplicate_concept:
+    severity: ERROR
+  stale_page:
+    severity: WARNING
+    threshold_days: 30
+  unmarked_inference:
+    severity: WARNING
+  missing_content_hash:
+    severity: ERROR
+  missing_counter_args:
+    severity: WARNING
+
+contradiction:
+  callout_type: warning
+  resolution_callout: success
+  auto_downgrade_confidence: LOW
+  track_in: "wiki/indexes/_contradictions.md"
+  require_counter_arguments: true
