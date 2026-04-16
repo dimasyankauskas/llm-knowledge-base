@@ -77,7 +77,7 @@ def _write_concept(wiki_dir: Path, name: str, title: str, content: str,
         "page": name,
         "content_hash": hash_content(content),
         "claims": [],
-        "sources": [{"file": s, "sections": []} for s in (source_refs or ["test-source.md"])],
+        "sources": [{"file": s, "sections_used": []} for s in (source_refs or ["test-source.md"])],
         "last_verified": "2026-04-15",
     }
     write_provenance(page_path, prov)

@@ -1,0 +1,14 @@
+{
+  "question": "What is RAG?",
+  "timestamp": "2026-04-16T19:41:28.314278+00:00",
+  "seed_pages": [
+    "RAG"
+  ],
+  "traversed_pages": [
+    {
+      "page": "RAG",
+      "score": 10.0
+    }
+  ],
+  "context": "RAG context"
+}

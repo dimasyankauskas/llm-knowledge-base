@@ -211,7 +211,9 @@ def build_typed_graph(
 
         for edge in page_edges:
             resolved_target = _resolve_target(edge["target"])
-            edge_key = (edge["source"], resolved_target, edge["type"])
+            # Case-normalize dedup key to prevent duplicates from
+            # body text vs frontmatter extraction with different casing
+            edge_key = (edge["source"].lower(), resolved_target.lower(), edge["type"].lower())
             if edge_key not in seen_edges:
                 seen_edges.add(edge_key)
                 weight = edge_weights.get(edge["type"], 1)

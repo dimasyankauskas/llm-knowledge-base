@@ -1,7 +1,10 @@
 # Wiki Log
 
-## 2026-04-15 — Initialized
+Chronological record of all wiki pipeline operations.
+Parseable with `grep`. Newest entries at the bottom.
 
-- Antigravity Wiki v2 installed
-- Directory structure created
-- Ready for first source ingestion
+## [2026-04-16 19:41] rebuild | Full rebuild
+
+- **Graph**: 19 nodes, 62 edges
+- **Health**: 0 errors, 0 warnings
+

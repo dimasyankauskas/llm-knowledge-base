@@ -14,13 +14,14 @@ Usage:
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils import (
-    WIKI_DIR, SOURCES_DIR, hash_content, read_page, write_page,
+    WIKI_DIR, SOURCES_DIR, hash_content, hash_file, read_page, write_page,
     write_provenance, list_wiki_pages,
 )
 from schema import load_schema
@@ -83,12 +84,46 @@ def migrate_frontmatter(page_path: Path) -> bool:
     return changed
 
 
+def _parse_source_ref(ref: str) -> dict:
+    """Parse a source_refs citation string into a provenance source dict.
+
+    Handles formats like:
+      - "[source: filename.md, §Section Name]"
+      - "filename.md"
+      - "migrated-content"
+
+    Returns dict with 'file', 'sections_used' keys matching provenance schema.
+    """
+    m = re.match(r"\[source:\s*(.+?)(?:,\s*§(.+?))?\]", ref)
+    if m:
+        return {
+            "file": m.group(1).strip(),
+            "sections_used": [m.group(2).strip()] if m.group(2) else [],
+        }
+    return {"file": ref.strip(), "sections_used": []}
+
+
+def _resolve_source_path(filename: str, sources_dir: Path) -> str:
+    """Resolve a bare filename to its subdirectory-relative path under sources/.
+
+    Searches sources/ subdirectories for the file. Returns the
+    subdirectory-relative path (e.g. 'article/filename.md') or the bare
+    filename if not found.
+    """
+    for subdir in sorted(sources_dir.iterdir()):
+        if subdir.is_dir():
+            candidate = subdir / filename
+            if candidate.exists():
+                return f"{subdir.name}/{filename}"
+    return filename
+
+
 def create_provenance_sidecar(page_path: Path) -> bool:
     """Create a .provenance.json sidecar for a wiki page if one doesn't exist.
 
     Returns True if a new sidecar was created.
     """
-    prov_path = page_path.with_suffix(".md.provenance.json")
+    prov_path = page_path.with_suffix(page_path.suffix + ".provenance.json")
     if prov_path.exists():
         return False
 
@@ -101,11 +136,19 @@ def create_provenance_sidecar(page_path: Path) -> bool:
     metadata = post.metadata
 
     source_refs = metadata.get("source_refs", ["migrated-content"])
-    # Convert source_refs to list of strings if they aren't already
-    sources = []
+    # Parse source_refs into provenance source dicts
+    sources: list[dict] = []
     for s in source_refs:
         if isinstance(s, str):
-            sources.append({"file": s, "sections": []})
+            parsed = _parse_source_ref(s)
+            # Resolve bare filename to subdirectory-relative path
+            resolved = _resolve_source_path(parsed["file"], SOURCES_DIR)
+            parsed["file"] = resolved
+            # Compute source content hash if file exists
+            src_file = SOURCES_DIR / resolved
+            if src_file.exists():
+                parsed["content_hash"] = hash_file(src_file)
+            sources.append(parsed)
         elif isinstance(s, dict):
             sources.append(s)
 

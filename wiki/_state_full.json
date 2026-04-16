@@ -1,0 +1,700 @@
+{
+  "schema_version": "2.0",
+  "last_updated": "2026-04-16",
+  "page_types": [
+    "concept",
+    "entity",
+    "index",
+    "timeline"
+  ],
+  "required_fields": {
+    "concept": [
+      "title",
+      "type",
+      "confidence",
+      "created",
+      "source_refs",
+      "content_hash"
+    ],
+    "entity": [
+      "title",
+      "type",
+      "entity_type",
+      "created",
+      "source_refs",
+      "content_hash"
+    ],
+    "index": [],
+    "timeline": [
+      "title",
+      "type",
+      "created"
+    ]
+  },
+  "pages": {
+    "Agentic KPI Framework": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/metrics",
+        "topic/product-management"
+      ],
+      "outlinks": [
+        "Agentic UX",
+        "Multi-Agent Orchestration",
+        "LinkedIn Semantic Search"
+      ],
+      "inlinks": [
+        "Agentic UX",
+        "LinkedIn Semantic Search",
+        "Multi-Agent Orchestration"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Agentic UX": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/ux",
+        "topic/agents"
+      ],
+      "outlinks": [
+        "Ambient AI",
+        "Multi-Agent Orchestration",
+        "Zero-Trust AI Design",
+        "Computer-Using Agents",
+        "Agentic KPI Framework",
+        "Edge-First Architecture",
+        "LinkedIn Semantic Search"
+      ],
+      "inlinks": [
+        "Agentic KPI Framework",
+        "Ambient AI",
+        "Computer-Using Agents",
+        "Dimas Yankauskas",
+        "Edge-First Architecture",
+        "LinkedIn Semantic Search",
+        "Multi-Agent Orchestration",
+        "Paratus Health",
+        "Zero-Trust AI Design"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Ambient AI": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/ux",
+        "topic/background-execution"
+      ],
+      "outlinks": [
+        "Agentic UX",
+        "Agentic UX",
+        "Edge-First Architecture",
+        "Local-First Development"
+      ],
+      "inlinks": [
+        "Agentic UX",
+        "Edge-First Architecture",
+        "Local-First Development"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Computer-Using Agents": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/agents",
+        "topic/gui-automation"
+      ],
+      "outlinks": [
+        "Agentic UX",
+        "Zero-Trust AI Design",
+        "Multi-Agent Orchestration",
+        "Anthropic",
+        "OpenAI",
+        "Adept AI",
+        "MultiOn"
+      ],
+      "inlinks": [
+        "Adept AI",
+        "Agentic UX",
+        "Anthropic",
+        "Multi-Agent Orchestration",
+        "MultiOn",
+        "OpenAI",
+        "Zero-Trust AI Design"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Edge-First Architecture": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/architecture",
+        "topic/mobile",
+        "topic/edge-computing"
+      ],
+      "outlinks": [
+        "Agentic UX",
+        "Ambient AI",
+        "Sovereign AI",
+        "Local-First Development"
+      ],
+      "inlinks": [
+        "Agentic UX",
+        "Ambient AI",
+        "Apple",
+        "Google",
+        "Local-First Development",
+        "Sovereign AI",
+        "Symposium AI"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "LinkedIn Semantic Search": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/career",
+        "topic/linkedin",
+        "topic/algorithms",
+        "topic/recruiting"
+      ],
+      "outlinks": [
+        "Agentic UX",
+        "Agentic KPI Framework",
+        "Dimas Yankauskas"
+      ],
+      "inlinks": [
+        "Agentic KPI Framework",
+        "Agentic UX",
+        "Dimas Yankauskas"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Local-First Development": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/architecture",
+        "topic/offline",
+        "topic/privacy"
+      ],
+      "outlinks": [
+        "Edge-First Architecture",
+        "Ambient AI",
+        "Sovereign AI",
+        "Symposium AI"
+      ],
+      "inlinks": [
+        "Ambient AI",
+        "Edge-First Architecture",
+        "Sovereign AI",
+        "Symposium AI"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Multi-Agent Orchestration": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/agents",
+        "topic/orchestration"
+      ],
+      "outlinks": [
+        "Agentic UX",
+        "Computer-Using Agents",
+        "Agentic KPI Framework",
+        "Paratus Health"
+      ],
+      "inlinks": [
+        "Agentic KPI Framework",
+        "Agentic UX",
+        "Computer-Using Agents",
+        "Dimas Yankauskas",
+        "Paratus Health"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Sovereign AI": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/sovereignty",
+        "topic/regulation",
+        "topic/infrastructure"
+      ],
+      "outlinks": [
+        "Edge-First Architecture",
+        "Zero-Trust AI Design",
+        "Local-First Development"
+      ],
+      "inlinks": [
+        "Apple",
+        "Edge-First Architecture",
+        "Local-First Development",
+        "Zero-Trust AI Design"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Zero-Trust AI Design": {
+      "type": "concept",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "topic/security",
+        "topic/trust"
+      ],
+      "outlinks": [
+        "Computer-Using Agents",
+        "Agentic UX",
+        "Sovereign AI"
+      ],
+      "inlinks": [
+        "Adept AI",
+        "Agentic UX",
+        "Anthropic",
+        "Computer-Using Agents",
+        "Sovereign AI"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Adept AI": {
+      "type": "entity",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "entity/organization",
+        "topic/cua",
+        "topic/desktop-automation"
+      ],
+      "outlinks": [
+        "Computer-Using Agents",
+        "Zero-Trust AI Design"
+      ],
+      "inlinks": [
+        "Computer-Using Agents"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Anthropic": {
+      "type": "entity",
+      "confidence": "HIGH",
+      "tags": [
+        "domain/ai",
+        "entity/organization",
+        "topic/cua"
+      ],
+      "outlinks": [
+        "Computer-Using Agents",
+        "Zero-Trust AI Design"
+      ],
+      "inlinks": [
+        "Computer-Using Agents",
+        "MultiOn",
+        "OpenAI"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Apple": {
+      "type": "entity",
+      "confidence": "HIGH",
+      "tags": [
+        "domain/ai",
+        "entity/organization",
+        "topic/edge-ai",
+        "topic/privacy"
+      ],
+      "outlinks": [
+        "Edge-First Architecture",
+        "Sovereign AI",
+        "Google"
+      ],
+      "inlinks": [
+        "Google"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Dimas Yankauskas": {
+      "type": "entity",
+      "confidence": "HIGH",
+      "tags": [
+        "domain/ai",
+        "entity/person",
+        "topic/health",
+        "topic/product-leadership"
+      ],
+      "outlinks": [
+        "LinkedIn Semantic Search",
+        "Agentic UX",
+        "Multi-Agent Orchestration"
+      ],
+      "inlinks": [
+        "LinkedIn Semantic Search"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Google": {
+      "type": "entity",
+      "confidence": "HIGH",
+      "tags": [
+        "domain/ai",
+        "entity/organization",
+        "topic/edge-ai",
+        "topic/on-device"
+      ],
+      "outlinks": [
+        "Edge-First Architecture",
+        "Apple"
+      ],
+      "inlinks": [
+        "Apple"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "MultiOn": {
+      "type": "entity",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "entity/organization",
+        "topic/cua",
+        "topic/browser-automation"
+      ],
+      "outlinks": [
+        "Computer-Using Agents",
+        "Anthropic"
+      ],
+      "inlinks": [
+        "Computer-Using Agents"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "OpenAI": {
+      "type": "entity",
+      "confidence": "HIGH",
+      "tags": [
+        "domain/ai",
+        "entity/organization",
+        "topic/cua"
+      ],
+      "outlinks": [
+        "Computer-Using Agents",
+        "Anthropic"
+      ],
+      "inlinks": [
+        "Computer-Using Agents"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Paratus Health": {
+      "type": "entity",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/health",
+        "entity/organization",
+        "topic/agentic-ux",
+        "topic/healthcare"
+      ],
+      "outlinks": [
+        "Agentic UX",
+        "Multi-Agent Orchestration"
+      ],
+      "inlinks": [
+        "Multi-Agent Orchestration"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    },
+    "Symposium AI": {
+      "type": "entity",
+      "confidence": "MEDIUM",
+      "tags": [
+        "domain/ai",
+        "entity/organization",
+        "topic/edge-ai",
+        "topic/local-first",
+        "topic/orchestration"
+      ],
+      "outlinks": [
+        "Edge-First Architecture",
+        "Local-First Development"
+      ],
+      "inlinks": [
+        "Local-First Development"
+      ],
+      "last_updated": "2026-04-15",
+      "stale": false
+    }
+  },
+  "active_contradictions": [],
+  "thin_pages": [],
+  "stale_pages": [],
+  "recent_changes": [
+    {
+      "page": "Agentic KPI Framework",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "Agentic UX",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "Ambient AI",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "Computer-Using Agents",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "Edge-First Architecture",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "LinkedIn Semantic Search",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "Local-First Development",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "Multi-Agent Orchestration",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "Sovereign AI",
+      "change": "updated",
+      "date": "2026-04-15"
+    },
+    {
+      "page": "Zero-Trust AI Design",
+      "change": "updated",
+      "date": "2026-04-15"
+    }
+  ],
+  "health": {
+    "errors": 0,
+    "warnings": 30,
+    "orphans": 0,
+    "broken_links": 0,
+    "last_lint": "2026-04-16T02:16:56.310233+00:00",
+    "issues": [
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Agentic KPI Framework",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Agentic KPI Framework",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Agentic KPI Framework",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Agentic UX",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Agentic UX",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Agentic UX",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Ambient AI",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Ambient AI",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Ambient AI",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Computer-Using Agents",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Computer-Using Agents",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Computer-Using Agents",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Edge-First Architecture",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Edge-First Architecture",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Edge-First Architecture",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "LinkedIn Semantic Search",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "LinkedIn Semantic Search",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "LinkedIn Semantic Search",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Local-First Development",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Local-First Development",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Local-First Development",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Multi-Agent Orchestration",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Multi-Agent Orchestration",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Multi-Agent Orchestration",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Sovereign AI",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Sovereign AI",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Sovereign AI",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Zero-Trust AI Design",
+        "message": "Facts-only section 'Definition' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Zero-Trust AI Design",
+        "message": "Facts-only section 'Key Properties' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      },
+      {
+        "code": "UNMARKED_INFERENCE",
+        "page": "Zero-Trust AI Design",
+        "message": "Facts-only section 'Relationships' has no source citations and relies on page-level provenance — consider adding inline [source: ...] citations for traceability",
+        "severity": "WARNING"
+      }
+    ]
+  }
+}

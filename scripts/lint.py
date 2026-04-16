@@ -95,8 +95,26 @@ def _parse_sections(content: str) -> dict[str, str]:
 
 
 def _is_index_page(page: Path) -> bool:
-    """Check if a page is an index page (stem starts with _)."""
-    return page.stem.startswith("_")
+    """Check if a page is an index page.
+
+    Index pages either:
+    - Have a stem starting with _
+    - Have type: index in frontmatter
+    - Live in the indexes/ directory
+    """
+    if page.stem.startswith("_"):
+        return True
+    # Check if in indexes/ directory
+    if "indexes" in page.parts:
+        return True
+    # Check frontmatter type
+    try:
+        post = read_page(page)
+        if (post.metadata or {}).get("type") == "index":
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def _collect_pages(wiki_dir: Path) -> list[Path]:
@@ -249,7 +267,8 @@ def check_frontmatter(pages: list[Path], schema: dict) -> list[LintIssue]:
 def check_sources(pages: list[Path]) -> list[LintIssue]:
     """Check for pages without source citations.
 
-    Skip index pages. Check for [source: text] in content or source_refs in frontmatter.
+    Skip index pages, timeline pages, and auto-generated pages.
+    Check for [source: text] in content or source_refs in frontmatter.
     Returns NO_SOURCES warnings.
     """
     issues: list[LintIssue] = []
@@ -262,6 +281,16 @@ def check_sources(pages: list[Path]) -> list[LintIssue]:
             text = page.read_text(encoding="utf-8")
         except Exception:
             continue
+
+        # Belt-and-suspenders: also check frontmatter type directly
+        # This catches index/timeline pages without _ prefix (e.g. by-topic.md)
+        try:
+            post = read_page(page)
+            page_type = (post.metadata or {}).get("type", "")
+            if page_type in ("index", "timeline"):
+                continue
+        except Exception:
+            pass
 
         has_source_in_content = bool(re.search(r"\[source:\s*[^\]]+\]", text, re.IGNORECASE))
 
@@ -500,7 +529,11 @@ def check_unmarked_inference(pages: list[Path], schema: dict) -> list[LintIssue]
     """Check that facts-only sections don't contain unmarked inferences.
 
     For each section marked as 'facts_only' in schema section_rules:
-    - Lines making claims without [source: ...] are potential unmarked inferences
+    - If the page has source_refs in frontmatter AND a Sources section with
+      citations, the page-level provenance is considered sufficient — only
+      warn if the facts_only section has ZERO source citations in its body.
+    - If the page lacks page-level provenance, warn on any claim line
+      without an inline [source: ...] citation.
     - Lines with > [!note] Inference: are properly marked and OK
     Returns UNMARKED_INFERENCE warnings.
     """
@@ -536,19 +569,38 @@ def check_unmarked_inference(pages: list[Path], schema: dict) -> list[LintIssue]
         if not facts_only_sections:
             continue
 
-        sections = _parse_sections(post.content)
+        # Check if page has page-level provenance (source_refs + Sources section)
+        metadata = post.metadata or {}
+        has_source_refs = bool(metadata.get("source_refs"))
+        sections_map = _parse_sections(post.content)
+        sources_section = sections_map.get("Sources", "")
+        has_sources_section_citations = bool(
+            source_citation_pattern.search(sources_section)
+        )
+        page_has_provenance = has_source_refs and has_sources_section_citations
 
         for section_name, rule in section_rules.items():
             if rule != "facts_only":
                 continue
-            if section_name not in sections:
+            if section_name not in sections_map:
                 continue
 
-            section_body = sections[section_name]
+            section_body = sections_map[section_name]
             if not section_body.strip():
                 continue
 
-            # Check paragraphs for unmarked inferences
+            # If page has provenance, only warn if the section has NO citations at all
+            if page_has_provenance:
+                if not source_citation_pattern.search(section_body):
+                    issues.append(LintIssue(
+                        "WARNING", "UNMARKED_INFERENCE", page.stem,
+                        f"Facts-only section '{section_name}' has no source citations "
+                        f"and relies on page-level provenance — consider adding inline "
+                        f"[source: ...] citations for traceability",
+                    ))
+                continue
+
+            # Without page-level provenance, check each claim line
             paragraphs = re.split(r"\n\s*\n", section_body)
             for para in paragraphs:
                 para_stripped = para.strip()

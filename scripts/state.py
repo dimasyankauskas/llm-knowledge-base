@@ -289,15 +289,77 @@ def load_health(wiki_dir: Path | None = None) -> dict:
 
 # ── Savers ───────────────────────────────────────────────────────────────────
 
+# Max pages to include in _state.json before truncation
+_MAX_PAGES_IN_STATE = 50
+
+
+def _compact_state(state: dict) -> dict:
+    """Create a compact version of state for agent bootstrap.
+
+    When page count exceeds _MAX_PAGES_IN_STATE, the pages dict is
+    replaced with a summary (count by type) plus only the pages that
+    need attention (stale, thin, contradictory). The full data is
+    saved to _state_full.json for programmatic access.
+    """
+    pages = state.get("pages", {})
+    if len(pages) <= _MAX_PAGES_IN_STATE:
+        return state
+
+    # Keep only pages that need attention + a random sample of healthy ones
+    attention_pages = {}
+    healthy_pages = {}
+    for name, data in pages.items():
+        is_attention = (
+            data.get("stale", False)
+            or name in state.get("thin_pages", [])
+            or name in state.get("active_contradictions", [])
+        )
+        if is_attention:
+            attention_pages[name] = data
+        else:
+            healthy_pages[name] = data
+
+    # Keep all attention pages + sample of healthy ones to stay under limit
+    healthy_budget = _MAX_PAGES_IN_STATE - len(attention_pages)
+    if healthy_budget > 0:
+        # Take the most recently updated healthy pages
+        sorted_healthy = sorted(
+            healthy_pages.items(),
+            key=lambda x: x[1].get("last_updated", ""),
+            reverse=True,
+        )
+        for name, data in sorted_healthy[:healthy_budget]:
+            attention_pages[name] = data
+
+    compact = dict(state)
+    compact["pages"] = attention_pages
+    compact["pages_truncated"] = True
+    compact["total_page_count"] = len(pages)
+    return compact
+
 
 def save_state(state: dict, wiki_dir: Path | None = None) -> None:
-    """Write _state.json to disk. Creates parent dirs if needed."""
+    """Write _state.json and _state_full.json to disk.
+
+    _state_full.json: complete state for programmatic access (scripts, CLI)
+    _state.json: compact state for agent bootstrap (capped at 50 pages)
+    """
     if wiki_dir is None:
         wiki_dir = WIKI_DIR
     state_path = wiki_dir / "_state.json"
+    full_path = wiki_dir / "_state_full.json"
     state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(
+
+    # Save full state first
+    full_path.write_text(
         json.dumps(state, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    # Save compact state for agent bootstrap
+    compact = _compact_state(state)
+    state_path.write_text(
+        json.dumps(compact, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
 

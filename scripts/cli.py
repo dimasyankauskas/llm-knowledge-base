@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -32,6 +33,7 @@ from lint import lint
 from consolidate import find_duplicate_pages, generate_indexes, generate_timelines
 from query import find_seed_pages, traverse_typed_graph, build_context
 from state import generate_state, generate_health, save_state, save_health, load_state, load_health
+from log import append_log
 
 
 def _lint_issues_to_dicts(issues: list[LintIssue]) -> list[dict]:
@@ -67,6 +69,14 @@ def cmd_ingest(args):
     save_state(state)
     health = generate_health(lint_results=_lint_issues_to_dicts(issues))
     save_health(health)
+
+    # Log
+    append_log("ingest", f"Source: {source.name}", {
+        "Type": source_type,
+        "Destination": str(dest),
+        "Graph": f"{graph.get('node_count', 0)} nodes, {graph.get('edge_count', 0)} edges",
+        "Lint": f"{errors} errors, {warnings} warnings",
+    })
 
 
 def cmd_extract(args):
@@ -145,7 +155,7 @@ def cmd_lint(args):
             "errors": errors,
             "warnings": warnings,
             "issues": [
-                {"severity": i.severity, "rule": i.rule, "page": i.page, "message": i.message}
+                {"severity": i.severity, "code": i.code, "page": i.page, "message": i.message}
                 for i in issues
             ],
         }
@@ -155,6 +165,15 @@ def cmd_lint(args):
             marker = "ERROR" if issue.severity == "ERROR" else "WARN"
             print(f"  [{marker}] {issue.page}: {issue.message} ({issue.code})")
         print(f"\n{errors} errors, {warnings} warnings")
+
+    # Log
+    codes = {}
+    for i in issues:
+        codes[i.code] = codes.get(i.code, 0) + 1
+    code_summary = ", ".join(f"{v}× {k}" for k, v in sorted(codes.items())) if codes else "clean"
+    append_log("lint", f"{errors} errors, {warnings} warnings", {
+        "Breakdown": code_summary,
+    })
 
 
 def cmd_consolidate(args):
@@ -226,6 +245,25 @@ def cmd_query(args):
         print(f"Traversed: {len(traversed)} pages (depth={args.depth})")
         print(f"Context: {len(context):,} chars\n")
         print(context)
+
+    # Save last query for save-answer command
+    last_query = {
+        "question": args.question,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "seed_pages": [p.stem for p in seed],
+        "traversed_pages": [{"page": r["page"].stem, "score": r["score"]} for r in traversed],
+        "context": context,
+    }
+    (WIKI_DIR / "_last_query.json").write_text(
+        json.dumps(last_query, indent=2, ensure_ascii=False), encoding="utf-8",
+    )
+
+    # Log
+    append_log("query", f'"{args.question}"', {
+        "Seeds": ", ".join(p.stem for p in seed),
+        "Traversed": f"{len(traversed)} pages",
+        "Context": f"{len(context):,} chars",
+    })
 
 
 def cmd_find(args):
@@ -324,6 +362,12 @@ def cmd_rebuild(args):
     save_health(health)
     print(f"Health: {health['errors']} errors, {health['warnings']} warnings")
 
+    # Log
+    append_log("rebuild", "Full rebuild", {
+        "Graph": f"{graph.get('node_count', 0)} nodes, {graph.get('edge_count', 0)} edges",
+        "Health": f"{health.get('errors', 0)} errors, {health.get('warnings', 0)} warnings",
+    })
+
 
 def cmd_generate_instructions(args):
     """Generate CLAUDE.md from SCHEMA.yaml."""
@@ -337,6 +381,106 @@ def cmd_generate_instructions(args):
     claude_md_path = Path(__file__).parent.parent / "CLAUDE.md"
     claude_md_path.write_text(content, encoding="utf-8")
     print(f"Generated: {claude_md_path}")
+
+
+def cmd_log(args):
+    """Print recent log entries."""
+    from utils import LOG_PATH
+    if not LOG_PATH.exists():
+        print("No log yet. Run some commands first.")
+        return
+    text = LOG_PATH.read_text(encoding="utf-8")
+    # Split into entries (each starts with ## [)
+    entries = text.split("\n## [")
+    header = entries[0]  # noqa: F841
+    body_entries = entries[1:]  # each is a log entry without the leading "## ["
+    if not body_entries:
+        print("Log is empty.")
+        return
+    # Show last N entries
+    n = args.n
+    for entry in body_entries[-n:]:
+        print(f"## [{entry.rstrip()}")
+
+
+def cmd_save_answer(args):
+    """Save last query result as a draft wiki page."""
+    last_query_path = WIKI_DIR / "_last_query.json"
+    if not last_query_path.exists():
+        print("No query to save. Run `wiki query` first.")
+        return
+
+    lq = json.loads(last_query_path.read_text(encoding="utf-8"))
+    title = args.title
+    page_type = args.type or "concept"
+    confidence = args.confidence or "LOW"
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Build source_refs from traversed pages
+    traversed_stems = [p["page"] for p in lq.get("traversed_pages", [])]
+    source_refs = [f"[source: wiki query, §{stem}]" for stem in traversed_stems[:5]]
+
+    # Build draft content
+    lines = []
+    lines.append(f"## Definition\n")
+    lines.append(f"Synthesized answer to: *{lq.get('question', '')}*\n")
+    lines.append("*[Edit this section with the actual definition]*\n")
+    lines.append(f"## Key Properties\n")
+    lines.append("- *[Fill in key properties from the query context]*\n")
+    lines.append(f"## How It Works\n")
+    # Include truncated context
+    context = lq.get("context", "")
+    if len(context) > 2000:
+        context = context[:2000] + "\n\n*[Context truncated — see full query output]*"
+    lines.append(f"{context}\n")
+    lines.append(f"## Relationships\n")
+    for stem in traversed_stems:
+        lines.append(f"- [[{stem}]]")
+    lines.append("")
+    lines.append(f"## Open Questions\n")
+    lines.append(f"- Original query: {lq.get('question', '')}\n")
+    lines.append(f"## Sources\n")
+    for ref in source_refs:
+        lines.append(f"- {ref}")
+    lines.append("")
+
+    content = "\n".join(lines)
+
+    # Build frontmatter
+    import frontmatter
+    post = frontmatter.Post(content)
+    post.metadata["title"] = title
+    post.metadata["type"] = page_type
+    post.metadata["confidence"] = confidence
+    post.metadata["created"] = today
+    post.metadata["source_refs"] = source_refs
+    from utils import hash_content
+    post.metadata["content_hash"] = hash_content(content)
+
+    drafts_dir = WIKI_DIR / "drafts"
+    drafts_dir.mkdir(parents=True, exist_ok=True)
+    draft_path = drafts_dir / f"{title}.md"
+    draft_path.write_text(frontmatter.dumps(post), encoding="utf-8")
+
+    print(f"Draft saved: {draft_path}")
+    print(f"Edit it, then run `wiki validate` to promote.")
+
+    append_log("save-answer", f'Draft: "{title}"', {
+        "Question": lq.get("question", ""),
+        "Pages referenced": ", ".join(traversed_stems[:5]),
+    })
+
+
+def cmd_extract_prompt(args):
+    """Generate a structured LLM prompt for creating a wiki page."""
+    from extract_prompt import generate_extraction_prompt
+    schema = load_schema()
+    prompt = generate_extraction_prompt(
+        source_name=args.source,
+        page_type=args.type or "concept",
+        schema=schema,
+    )
+    print(prompt)
 
 
 def build_parser():
@@ -431,6 +575,24 @@ def build_parser():
     # generate-instructions
     p_gen = subparsers.add_parser("generate-instructions", help="Generate CLAUDE.md from SCHEMA.yaml")
     p_gen.set_defaults(func=cmd_generate_instructions)
+
+    # log
+    p_log = subparsers.add_parser("log", help="Show recent log entries")
+    p_log.add_argument("-n", type=int, default=10, help="Number of entries (default: 10)")
+    p_log.set_defaults(func=cmd_log)
+
+    # save-answer
+    p_save = subparsers.add_parser("save-answer", help="Save last query as draft page")
+    p_save.add_argument("title", help="Page title for the draft")
+    p_save.add_argument("--type", default="concept", help="Page type (default: concept)")
+    p_save.add_argument("--confidence", default="LOW", help="Confidence level (default: LOW)")
+    p_save.set_defaults(func=cmd_save_answer)
+
+    # extract-prompt
+    p_ep = subparsers.add_parser("extract-prompt", help="Generate LLM prompt for page creation")
+    p_ep.add_argument("source", help="Source filename")
+    p_ep.add_argument("--type", default="concept", help="Page type (default: concept)")
+    p_ep.set_defaults(func=cmd_extract_prompt)
 
     return parser
 

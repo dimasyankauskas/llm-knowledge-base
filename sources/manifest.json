@@ -1,4 +1,23 @@
 {
   "version": "1.0",
-  "sources": []
+  "sources": [
+    {
+      "filename": "ai-product-strategy-research-plan-google-2026-04-14T00-50-30.md",
+      "source_type": "article",
+      "content_hash": "f869a5cdab0e1c84",
+      "ingested_at": "2026-04-16T00:05:38.285137+00:00",
+      "status": "ingested",
+      "concepts_generated": [],
+      "entities_generated": []
+    },
+    {
+      "filename": "linkedin-profile-optimization-for-produc-2026-04-14T01-07-07.md",
+      "source_type": "article",
+      "content_hash": "b9ff5fa539dec145",
+      "ingested_at": "2026-04-16T00:05:44.912793+00:00",
+      "status": "ingested",
+      "concepts_generated": [],
+      "entities_generated": []
+    }
+  ]
 }

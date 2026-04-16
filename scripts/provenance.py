@@ -92,6 +92,37 @@ def add_source(
     return prov
 
 
+def _resolve_source_file(filename: str, sources_dir: Path) -> Path | None:
+    """Resolve a source filename to its actual path on disk.
+
+    Tries in order:
+    1. Direct path: sources_dir / filename (works for subdirectory-relative paths
+       like 'article/paper.md')
+    2. Subdirectory search: look for filename in any subdirectory of sources_dir
+    3. Bare filename at top level of sources_dir
+
+    Returns the Path if found, None otherwise.
+    """
+    # Try direct path first (handles 'article/paper.md' style)
+    direct = sources_dir / filename
+    if direct.exists():
+        return direct
+
+    # Try subdirectory search (handles bare 'paper.md' when file is in article/)
+    for subdir in sorted(sources_dir.iterdir()):
+        if subdir.is_dir():
+            candidate = subdir / filename
+            if candidate.exists():
+                return candidate
+
+    # Try top-level
+    top = sources_dir / filename
+    if top.exists():
+        return top
+
+    return None
+
+
 def check_staleness(prov: dict, sources_dir: Path | None = None) -> list[str]:
     """Check if any source in the provenance record has changed.
 
@@ -106,18 +137,19 @@ def check_staleness(prov: dict, sources_dir: Path | None = None) -> list[str]:
         List of source filenames that have changed (stale) or are missing.
     """
     if sources_dir is None:
-        from scripts.utils import SOURCES_DIR
+        from utils import SOURCES_DIR
         sources_dir = SOURCES_DIR
 
     stale: list[str] = []
     for src in prov.get("sources", []):
-        filepath = sources_dir / src["file"]
-        if not filepath.exists():
-            stale.append(src["file"])
+        filename = src.get("file", "")
+        filepath = _resolve_source_file(filename, sources_dir)
+        if filepath is None:
+            stale.append(filename)
             continue
         current_hash = hash_file(filepath)
-        if current_hash != src["content_hash"]:
-            stale.append(src["file"])
+        if current_hash != src.get("content_hash", ""):
+            stale.append(filename)
     return stale
 
 

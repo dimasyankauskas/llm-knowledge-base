@@ -168,34 +168,44 @@ def find_all_wikilinks() -> dict[str, list[str]]:
 # ── Typed Relation Extraction (v2) ─────────────────────────────────────
 
 def extract_typed_relations(content: str) -> list[dict]:
-    """Parse context around [[wikilinks]] to infer edge types.
+    """Parse wikilinks to extract typed relations.
 
-    Looks at the 1-3 words before each wikilink to detect relation keywords
-    defined in SCHEMA.yaml (implements, extends, contradicts, cites,
-    prerequisite_of, trades_off, derived_from). Returns a list of dicts
-    like {"target": "Neural IR", "type": "implements"}. Untyped links
-    default to type "neutral".
+    Detects relation types from two sources:
+    1. Inline suffix: [[Target Page]]:relation_type (e.g. [[RAG]]:implements)
+    2. Context prefix: relation keywords in the 1-3 words before the wikilink
+       (e.g. "implements [[RAG]]")
+
+    Relation keywords are defined in SCHEMA.yaml: implements, extends,
+    contradicts, cites, prerequisite_of, trades_off, derived_from.
+    Untyped links default to "neutral".
     """
     results: list[dict] = []
     keyword_set = set(_RELATION_KEYWORDS)
 
+    # Pattern to match the :relation_type suffix after a wikilink
+    _SUFFIX_PATTERN = re.compile(r":(" + "|".join(keyword_set) + r")\b")
+
     for match in WIKILINK_PATTERN.finditer(content):
         target = match.group(1)
+        link_end = match.end()
         link_start = match.start()
 
-        # Extract the text immediately before the wikilink (up to 30 chars)
-        # and find the last 1-3 words
-        context_start = max(0, link_start - 1)
-        prefix = content[:context_start].rstrip()
-        # Grab the last up to 3 words from the prefix
-        prefix_words = _WORD_PATTERN.findall(prefix)
-
+        # 1. Check for inline suffix: [[Target]]:implements
         relation = "neutral"
-        # Check the last 1-3 words for a relation keyword (closest first)
-        for word in reversed(prefix_words[-3:]):
-            if word.lower() in keyword_set:
-                relation = word.lower()
-                break
+        after_text = content[link_end:link_end + 30]
+        suffix_match = _SUFFIX_PATTERN.match(after_text)
+        if suffix_match:
+            relation = suffix_match.group(1)
+        else:
+            # 2. Fallback: check 1-3 words before the wikilink
+            context_start = max(0, link_start - 1)
+            prefix = content[:context_start].rstrip()
+            prefix_words = _WORD_PATTERN.findall(prefix)
+
+            for word in reversed(prefix_words[-3:]):
+                if word.lower() in keyword_set:
+                    relation = word.lower()
+                    break
 
         results.append({"target": target, "type": relation})
 

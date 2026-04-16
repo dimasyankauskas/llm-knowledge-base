@@ -129,21 +129,24 @@ wiki extract <source> --type <type>    # Register source
 wiki validate                           # Validate drafts
 wiki link                               # Build graph
 wiki refine                             # Gap analysis
-wiki lint [--json]                      # 12 structural checks
+wiki lint [--json]                      # Structural checks
 wiki consolidate                        # Merge + indexes
 
-# Inspection
-wiki state                              # State summary
-wiki health                             # Health summary
+# Queries & Inspection
+wiki log [-n 10]                        # View chronological journal
 wiki query "question" --depth 2 [--json]
+wiki save-answer "Title" --type concept # Save last query as draft
 wiki find --tag <tag> --confidence <level>
 wiki provenance <page>                  # Evidence chain
+wiki state                              # State summary
+wiki health                             # Health summary
 
-# Maintenance
-wiki register <source> --type <type>   # Register only
+# Maintenance & Prompts
+wiki extract-prompt <source>            # Gen LLM prompt from SCHEMA
+wiki register <source> --type <type>    # Register only
 wiki check <source>                     # Dedup check
 wiki rebuild                            # Regenerate all
-wiki generate-instructions               # Regenerate this file
+wiki generate-instructions              # Regenerate this file
 ```
 
 ## Key Conventions

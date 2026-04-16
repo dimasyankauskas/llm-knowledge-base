@@ -38,10 +38,54 @@ EDGE_WEIGHTS = {
 }
 
 
+def index_boost(question: str, wiki_dir: Path | None = None) -> dict[str, float]:
+    """Read _index.md and score each page by question-word overlap with its entry.
+
+    The index contains one-line summaries per page. Matching question words
+    against these summaries provides a content-aware boost before the more
+    expensive per-page scoring.
+
+    Returns {page_stem: boost_score}.
+    """
+    if wiki_dir is None:
+        wiki_dir = WIKI_DIR
+
+    index_path = wiki_dir / "indexes" / "_index.md"
+    if not index_path.exists():
+        return {}
+
+    try:
+        text = index_path.read_text(encoding="utf-8")
+    except Exception:
+        return {}
+
+    question_words = set(question.lower().split())
+    boosts: dict[str, float] = {}
+
+    # Parse lines like "- [[Page Name]]" or "- [[Page Name]] — summary text"
+    import re
+    link_pattern = re.compile(r"-\s*\[\[([^\]]+)\]\](?:\s*[—–-]\s*(.*))?")
+
+    for line in text.splitlines():
+        m = link_pattern.match(line.strip())
+        if not m:
+            continue
+        page_stem = m.group(1)
+        summary = (m.group(2) or "").lower()
+        line_text = (page_stem + " " + summary).lower()
+
+        overlap = sum(1 for w in question_words if len(w) > 2 and w in line_text)
+        if overlap > 0:
+            boosts[page_stem] = overlap * 5  # +5 per matching word in index
+
+    return boosts
+
+
 def find_seed_pages(question: str, wiki_dir: Path | None = None, top_k: int = 5) -> list[Path]:
     """Find seed pages relevant to a question using keyword + tag + alias matching.
 
     Scoring:
+    - Index boost: +5 per question-word match in _index.md summary
     - Title word overlap: +10 per matching word
     - Alias match: +8 per matching alias
     - Tag word overlap: +3 per matching tag word
@@ -51,6 +95,9 @@ def find_seed_pages(question: str, wiki_dir: Path | None = None, top_k: int = 5)
     """
     if wiki_dir is None:
         wiki_dir = WIKI_DIR
+
+    # Get index-first boost scores
+    boosts = index_boost(question, wiki_dir)
 
     # Collect pages from concepts and entities directories
     pages = []
@@ -75,6 +122,9 @@ def find_seed_pages(question: str, wiki_dir: Path | None = None, top_k: int = 5)
             continue
 
         score = 0.0
+
+        # Index boost (from _index.md summary matching)
+        score += boosts.get(page.stem, 0.0)
 
         # Title match
         title = post.metadata.get("title", page.stem).lower()
