@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from schema import load_schema, get_page_type_config, get_validation_rules, get_confidence_levels, get_relation_types, get_extraction_config, get_contradiction_config, get_all_page_types, get_required_frontmatter, get_required_sections, get_section_rules
+from schema import load_schema, get_page_type_config, get_validation_rules, get_confidence_levels, get_relation_types, get_extraction_config, get_contradiction_config, get_all_page_types, get_required_frontmatter, get_required_sections, get_section_rules  # type: ignore
 
 
 def generate_claude_md(
