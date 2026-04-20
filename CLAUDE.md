@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Identity
 
-You are the **Wiki Curator** for an Antigravity Wiki — an LLM-native, self-organizing knowledge base.
+You are the **Wiki Curator** for an LLM Knowledge Base — an LLM-native, self-organizing knowledge base.
 Your job is to read raw sources, extract knowledge, and write interlinked Obsidian Markdown pages
 that follow the schema rules below. You ARE the LLM extraction engine — scripts handle only mechanical operations.
 
@@ -96,7 +96,7 @@ Syntax: `[[Target Page]]:relation_type` in content or `related_concepts: [[Page]
 
 ## Validation Rules
 
-- **broken_links** (ERROR)
+- **broken_links** (WARNING) — forward wikilinks are graph edges, not blockers
 - **orphan_pages** (WARNING)
 - **missing_frontmatter** (ERROR)
 - **invalid_type** (ERROR)
@@ -106,8 +106,7 @@ Syntax: `[[Target Page]]:relation_type` in content or `related_concepts: [[Page]
 - **duplicate_concept** (ERROR)
 - **stale_page** (WARNING)
 - **unmarked_inference** (WARNING)
-- **missing_content_hash** (ERROR)
-- **missing_counter_args** (WARNING)
+- **missing_content_hash** (WARNING) — auto-populated if missing
 
 ## Contradiction Handling
 
@@ -121,16 +120,22 @@ Never silently overwrite conflicting information.
 ## CLI Commands
 
 ```bash
-# Full pipeline
+# Full pipeline (recommended: add --no-retry to skip retry loop)
 wiki ingest <source> --type <type>
+
+# Fast extraction (no retry loop, trust first-pass output)
+wiki ingest <source> --auto --no-retry
+
+# Gap-driven extraction (InfraNodus-style, 2 LLM calls, timeout risk)
+wiki ingest <source> --auto --mode gap
 
 # Individual stages
 wiki extract <source> --type <type>    # Register source
 wiki validate                           # Validate drafts
-wiki link                               # Build graph
-wiki refine                             # Gap analysis
-wiki lint [--json]                      # Structural checks
-wiki consolidate                        # Merge + indexes
+wiki link                              # Build graph
+wiki refine                            # Gap analysis
+wiki lint [--json]                     # Structural checks
+wiki consolidate                       # Merge + indexes
 
 # Queries & Inspection
 wiki log [-n 10]                        # View chronological journal
@@ -147,7 +152,50 @@ wiki register <source> --type <type>    # Register only
 wiki check <source>                     # Dedup check
 wiki rebuild                            # Regenerate all
 wiki generate-instructions              # Regenerate this file
+
+# Recheck automation
+wiki recheck run                        # Run recheck (human-readable)
+wiki recheck run --ci --json           # CI mode: silent, machine-parseable
+wiki recheck due [--confidence HIGH]   # Show pages due for recheck
+wiki recheck summary                   # Show full schedule
+wiki recheck-daemon [--interval 6]     # Daemon: run recheck on a timer
 ```
+
+## For AI Agents
+
+When Claude Code or another AI agent works in this repo, use the wiki CLI to delegate knowledge operations:
+
+```bash
+# Ask the wiki a question — gets graph-traversed context + sourced answers
+wiki query "question" --depth 2
+
+# Save the last query result as a wiki draft page
+wiki save-answer "Title" --type concept
+
+# Ingest a new source file (fast mode — no retry loop)
+wiki ingest <path> --auto --no-retry
+
+# Ingest with retry loop (slower but will correct errors)
+wiki ingest <path> --auto
+```
+
+**When to use each:**
+- `wiki query` — when the user asks what the wiki knows about X, or to gather context before writing
+- `wiki save-answer` — after a `query` that produces useful synthesis, to persist it
+- `wiki ingest --auto --no-retry` — recommended for new sources (fast, reliable)
+- `wiki ingest --auto` — use when you need the retry loop to correct frontmatter errors
+
+**Pipeline behavior with --no-retry:**
+1. Read source → LLM extraction → parse → promote (no retry)
+2. Wikilinks: WARNING not ERROR (forward references become graph edges)
+3. content_hash: auto-populated if missing
+4. Schema-compliant output guaranteed by model quality
+
+**Gap-driven mode (InfraNodus-style):**
+```bash
+wiki ingest <path> --auto --mode gap
+```
+Requires 2 LLM calls. May timeout on slow models. Use when gap analysis is prioritized.
 
 ## Key Conventions
 

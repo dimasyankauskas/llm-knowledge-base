@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Graph-Traversal Query Engine
+LLM Knowledge Base v2 — Graph-Traversal Query Engine
 Finds relevant wiki pages using keyword + tag + alias matching,
 then expands context via typed graph traversal with weighted edges.
 
@@ -273,7 +273,7 @@ def build_context(pages: list[dict], max_chars: int = 50_000) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Antigravity Wiki v2 — Graph-Traversal Context Builder",
+        description="LLM Knowledge Base v2 — Graph-Traversal Context Builder",
     )
     parser.add_argument("question", help="Question to find context for")
     parser.add_argument("--depth", type=int, default=2, help="Link traversal depth (default: 2)")

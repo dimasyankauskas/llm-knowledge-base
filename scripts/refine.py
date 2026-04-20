@@ -1,4 +1,4 @@
-"""Antigravity Wiki v2 — Refine Stage.
+"""LLM Knowledge Base v2 — Refine Stage.
 
 Stage 4 of the pipeline: gap analysis, contradiction detection,
 counter-argument generation hints, and staleness checking.
@@ -12,6 +12,11 @@ from pathlib import Path
 import frontmatter
 
 from scripts.provenance import get_stale_pages
+from scripts.recheck_scheduler import (
+    should_recheck_page,
+    record_recheck_result,
+    load_schedule,
+)
 from scripts.schema import load_schema, get_page_type_config
 from scripts.utils import (
     WIKI_DIR,
@@ -267,14 +272,60 @@ def generate_refinement_tasks(
             "details": {"target": item["target"]},
         })
 
-    # Stale pages — medium severity
-    for page_name in check_staleness_all(wiki_dir, sources_dir):
+    # Stale pages — backoff-aware, confidence-weighted
+    # Load the recheck schedule once to avoid per-page disk reads
+    recheck_sched = load_schedule()
+    currently_stale = check_staleness_all(wiki_dir, sources_dir)
+    stale_set = set(currently_stale)
+
+    for page_name in currently_stale:
+        # Always include currently-stale pages as tasks; severity is boosted
+        # if the page is overdue for its next scheduled check
+        entry = recheck_sched.get(page_name, {})
+        overdue_h = 0.0
+        if entry.get("next_check_after"):
+            from datetime import datetime, timezone
+            due_dt = datetime.fromisoformat(entry["next_check_after"])
+            if due_dt.tzinfo is None:
+                due_dt = due_dt.replace(tzinfo=timezone.utc)
+            overdue_h = (datetime.now(timezone.utc) - due_dt).total_seconds() / 3600
+            if overdue_h > 0:
+                overdue_h = overdue_h
         tasks.append({
             "task_type": "stale",
-            "severity": "medium",
+            "severity": "high" if overdue_h > 0 else "medium",
             "page": page_name,
-            "details": {"reason": "source_changed"},
+            "details": {
+                "reason": "source_changed",
+                "overdue_h": overdue_h,
+                "backoff_applied": entry.get("current_interval_h", None),
+            },
         })
+        # Record this recheck result so interval resets
+        confidence = entry.get("confidence", "MEDIUM")
+        record_recheck_result(page_name, is_stale=True, confidence=confidence)
+
+    # Add pages that are not currently stale but ARE due for their scheduled recheck.
+    # These are pages whose backoff window has expired — they haven't been verified
+    # since the window closed.
+    for page_name, entry in recheck_sched.items():
+        if page_name in stale_set:
+            continue  # already covered above
+        if not should_recheck_page(page_name, schedule=recheck_sched):
+            continue  # still within backoff window
+        tasks.append({
+            "task_type": "scheduled_recheck",
+            "severity": "low",
+            "page": page_name,
+            "details": {
+                "reason": "backoff_expired",
+                "interval_h": entry.get("current_interval_h", 24),
+                "last_checked": entry.get("last_checked_at"),
+            },
+        })
+        # Record a clean result so backoff applies
+        confidence = entry.get("confidence", "MEDIUM")
+        record_recheck_result(page_name, is_stale=False, confidence=confidence)
 
     # Thin pages — medium severity
     for item in find_thin_pages(wiki_dir, schema):

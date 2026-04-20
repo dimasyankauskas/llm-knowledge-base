@@ -1,4 +1,4 @@
-"""State management for Antigravity Wiki v2.
+"""State management for LLM Knowledge Base v2.
 
 Generates _state.json and _health.json for agent awareness.
 These are the key files the agent reads at session start.

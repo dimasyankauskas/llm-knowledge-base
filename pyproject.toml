@@ -3,10 +3,10 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "antigravity-wiki"
+name = "llm-knowledge-base"
 version = "2.0.0"
-description = "LLM-native, self-organizing knowledge base engine"
-readme = "docs/MANUAL.md"
+description = "LLM Wiki — an LLM-native, self-organizing knowledge base with typed graph extraction"
+readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 dependencies = [
@@ -15,6 +15,11 @@ dependencies = [
     "rich>=13.9",
     "pymupdf>=1.25.0",
 ]
+
+[project.optional-dependencies]
+ollama = ["openai>=1.0"]
+anthropic = ["anthropic>=0.96"]
+all = ["openai>=1.0", "anthropic>=0.96"]
 
 [project.scripts]
 wiki = "scripts.cli:main"

@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Consolidate Stage
+LLM Knowledge Base v2 — Consolidate Stage
 
 Stage 6 of the pipeline: detect duplicates, merge pages, generate indexes
 and timelines.
@@ -514,7 +514,7 @@ def main():
     """
     wiki_dir = WIKI_DIR
 
-    print("=== Antigravity Wiki v2 — Consolidate Stage ===\n")
+    print("=== LLM Knowledge Base v2 — Consolidate Stage ===\n")
 
     # Find duplicates
     print("Finding duplicate pages...")

@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — CLAUDE.md Generator
+LLM Knowledge Base v2 — CLAUDE.md Generator
 
 Generates CLAUDE.md from SCHEMA.yaml so the agent's instructions
 stay in sync with the schema automatically.
@@ -46,7 +46,7 @@ def generate_claude_md(
     # ── Identity ──
     lines.append("## Identity")
     lines.append("")
-    lines.append("You are the **Wiki Curator** for an Antigravity Wiki — an LLM-native, self-organizing knowledge base.")
+    lines.append("You are the **Wiki Curator** for an LLM Knowledge Base — an LLM-native, self-organizing knowledge base.")
     lines.append("Your job is to read raw sources, extract knowledge, and write interlinked Obsidian Markdown pages")
     lines.append("that follow the schema rules below. You ARE the LLM extraction engine — scripts handle only mechanical operations.")
     lines.append("")

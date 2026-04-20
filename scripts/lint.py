@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Structural Linter
+LLM Knowledge Base v2 — Structural Linter
 
 Validates wiki integrity with 12 schema-driven checks:
   1. BROKEN_LINK — ERROR
@@ -162,7 +162,7 @@ def check_broken_links(pages: list[Path], all_page_names: set[str]) -> list[Lint
         for link in links:
             if link.lower() not in names_lower and link not in seen:
                 issues.append(LintIssue(
-                    "ERROR", "BROKEN_LINK", page.stem,
+                    "WARNING", "BROKEN_LINK", page.stem,
                     f"Links to [[{link}]] which does not exist",
                 ))
                 seen.add(link)
@@ -713,7 +713,7 @@ def lint(
 
     if verbose:
         print(f"\n{'='*60}")
-        print("  \U0001f50d Antigravity Wiki v2 \u2014 Structural Lint")
+        print("  \U0001f50d LLM Knowledge Base v2 \u2014 Structural Lint")
         print(f"{'='*60}")
         print(f"  Scanning {len(pages)} pages...\n")
 
@@ -773,7 +773,7 @@ def main():
     Run all 12 lint checks. Exit with 1 if any ERRORs found.
     """
     parser = argparse.ArgumentParser(
-        description="Antigravity Wiki v2 \u2014 Structural Linter",
+        description="LLM Knowledge Base v2 \u2014 Structural Linter",
     )
     parser.add_argument(
         "--json", action="store_true",

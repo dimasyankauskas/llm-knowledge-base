@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Unified CLI
+LLM Knowledge Base v2 — Unified CLI
 
 Single entry point for all pipeline operations.
 
@@ -29,11 +29,21 @@ from extract import register_source, check_dedup, classify_source_type
 from validate import validate_draft, promote_draft
 from link import build_typed_graph, verify_bidirectional_links, save_graph
 from refine import generate_refinement_tasks
+from recheck_scheduler import (
+    get_pages_due_for_recheck,
+    print_schedule_summary,
+    record_recheck_result,
+    load_schedule,
+    should_recheck_page,
+)
 from lint import lint
 from consolidate import find_duplicate_pages, generate_indexes, generate_timelines
 from query import find_seed_pages, traverse_typed_graph, build_context
 from state import generate_state, generate_health, save_state, save_health, load_state, load_health
 from log import append_log
+from auto_ingest import auto_ingest as run_auto_ingest
+
+DEFAULT_PAGE_TYPE = "concept"
 
 
 def _lint_issues_to_dicts(issues: list[LintIssue]) -> list[dict]:
@@ -45,7 +55,14 @@ def _lint_issues_to_dicts(issues: list[LintIssue]) -> list[dict]:
 
 
 def cmd_ingest(args):
-    """Full pipeline: extract → validate → link → lint → state."""
+    """Full pipeline: extract → validate → link → lint → state.
+
+    With --auto: run LLM-powered auto-ingest instead.
+    """
+    if getattr(args, "auto", False):
+        cmd_auto_ingest(args)
+        return
+
     source = Path(args.source)
     source_type = args.type or classify_source_type(source)
 
@@ -77,6 +94,47 @@ def cmd_ingest(args):
         "Graph": f"{graph.get('node_count', 0)} nodes, {graph.get('edge_count', 0)} edges",
         "Lint": f"{errors} errors, {warnings} warnings",
     })
+
+
+def cmd_auto_ingest(args):
+    """LLM-powered auto-ingest: read source → generate page → validate → promote."""
+    source = Path(args.source)
+    page_type = args.type or DEFAULT_PAGE_TYPE
+    retry_on_error = not (args.no_retry or args.fast)
+    extraction_mode = getattr(args, "mode", "standard")
+
+    print(f"\n{'='*60}")
+    print(f"  Auto-ingest: {source.name}")
+    if extraction_mode == "gap":
+        print(f"  Mode: gap-driven (InfraNodus-style)")
+    print(f"{'='*60}\n")
+
+    promoted = run_auto_ingest(
+        source_path=source,
+        page_type=page_type,
+        verbose=True,
+        retry_on_error=retry_on_error,
+        extraction_mode=extraction_mode,
+    )
+
+    # Post-auto-ingest: rebuild graph + lint + state
+    schema = load_schema()
+    graph = build_typed_graph(schema=schema)
+    save_graph(graph)
+
+    issues = lint()
+    errors = sum(1 for i in issues if i.severity == "ERROR")
+    warnings = sum(1 for i in issues if i.severity == "WARNING")
+    print(f"\nLint: {errors} errors, {warnings} warnings")
+
+    state = generate_state()
+    save_state(state)
+    health = generate_health(lint_results=_lint_issues_to_dicts(issues))
+    save_health(health)
+
+    print(f"\n{'='*60}")
+    print(f"  Promoted: {len(promoted)} page(s)")
+    print(f"{'='*60}")
 
 
 def cmd_extract(args):
@@ -135,14 +193,34 @@ def cmd_link(args):
 
 
 def cmd_refine(args):
-    """Run refinement analysis."""
+    """Run refinement analysis with backoff-aware stale detection."""
     tasks = generate_refinement_tasks()
     if not tasks:
         print("No refinement tasks found.")
         return
 
-    for task in sorted(tasks, key=lambda t: t.get("priority", 0), reverse=True):
-        print(f"  [{task.get('priority', 0)}] {task['type']}: {task.get('page', task.get('description', ''))}")
+    # Sort by severity then by overdue amount
+    severity_order = {"high": 0, "medium": 1, "low": 2}
+    for task in sorted(
+        tasks,
+        key=lambda t: (
+            severity_order.get(t.get("severity", "low"), 3),
+            -(t.get("details", {}).get("overdue_h", 0.0)),
+        ),
+        reverse=False,
+    ):
+        page = task.get("page", "")
+        sev = task.get("severity", "?")
+        ttype = task.get("task_type", "")
+        details = task.get("details", {})
+        extra = ""
+        if ttype == "stale" and details.get("overdue_h", 0) > 0:
+            extra = f" (overdue {details['overdue_h']:.1f}h)"
+        elif ttype == "stale" and details.get("backoff_applied"):
+            extra = f" [interval={details['backoff_applied']:.1f}h]"
+        elif ttype == "scheduled_recheck":
+            extra = f" (backoff expired, was {details.get('interval_h', 24):.1f}h interval)"
+        print(f"  [{sev.upper():>6}] {ttype}: {page}{extra}")
 
 
 def cmd_lint(args):
@@ -471,6 +549,106 @@ def cmd_save_answer(args):
     })
 
 
+def cmd_recheck(args):
+    """Show recheck schedule summary (default action for 'wiki recheck')."""
+    print_schedule_summary()
+
+
+def cmd_recheck_due(args):
+    """Show pages that are due for rechecking."""
+    confidence = getattr(args, "confidence", None)
+    limit = getattr(args, "limit", None)
+    due = get_pages_due_for_recheck(confidence_filter=confidence, limit=limit)
+    if not due:
+        print("No pages are currently due for rechecking.")
+        return
+    print(f"\nPages due for recheck ({len(due)}):\n")
+    for item in due:
+        stale_mark = " [CURRENTLY STALE]" if item["is_currently_stale"] else ""
+        print(
+            f"  {item['page_name']} [{item['confidence']}] "
+            f"overdue={item['overdue_by_h']:.1f}h "
+            f"interval={item['interval_h']:.1f}h{stale_mark}"
+        )
+
+
+def cmd_recheck_summary(args):
+    """Show the full recheck schedule."""
+    print_schedule_summary()
+
+
+def cmd_recheck_run(args):
+    """Run backoff-aware recheck on tracked pages (updates schedule)."""
+    import frontmatter
+    from utils import WIKI_DIR, SOURCES_DIR, list_concept_pages, list_entity_pages
+
+    specific_page = getattr(args, "page", None)
+    schedule = load_schedule()
+    pages_to_check: list[tuple[str, str]] = []
+
+    if specific_page:
+        pages_to_check = [(specific_page, schedule.get(specific_page, {}).get("confidence", "MEDIUM"))]
+    else:
+        # Collect all tracked pages
+        for page_path in list_concept_pages() + list_entity_pages():
+            pages_to_check.append((page_path.stem, schedule.get(page_path.stem, {}).get("confidence", "MEDIUM")))
+
+    from provenance import get_stale_pages
+    try:
+        stale_now = set(get_stale_pages(WIKI_DIR, SOURCES_DIR))
+    except Exception:
+        stale_now = set()
+
+    results_stale = []
+    results_clean = []
+    results_skip = []
+
+    for page_name, confidence in pages_to_check:
+        if not should_recheck_page(page_name, confidence, schedule):
+            results_skip.append(page_name)
+            continue
+        is_stale = page_name in stale_now
+        entry = record_recheck_result(page_name, is_stale=is_stale, confidence=confidence)
+        if is_stale:
+            results_stale.append((page_name, entry["current_interval_h"]))
+        else:
+            results_clean.append((page_name, entry["current_interval_h"], entry["next_check_after"]))
+
+    if args.json:
+        import json as _json
+        output = {
+            "rechecked": len(results_stale) + len(results_clean),
+            "stale": [{"page": p, "interval_h": i} for p, i in results_stale],
+            "clean": [{"page": p, "interval_h": i, "next_check": n} for p, i, n in results_clean],
+            "skipped": len(results_skip),
+        }
+        print(_json.dumps(output, indent=2, ensure_ascii=False))
+        return
+
+    if results_stale:
+        print("\nStale pages (interval reset to minimum):")
+        if not args.ci:
+            for page_name, interval in results_stale:
+                print(f"  STALE  {page_name} → interval reset to {interval:.1f}h")
+        else:
+            print(f"  {len(results_stale)} stale page(s)")
+    if results_clean:
+        print("\nClean pages (backoff applied):")
+        if not args.ci:
+            for page_name, interval, next_check in results_clean:
+                print(f"  CLEAN  {page_name} → interval now {interval:.1f}h, next after {next_check}")
+        else:
+            print(f"  {len(results_clean)} clean page(s)")
+    if results_skip:
+        if args.ci:
+            print(f"Skipped: {len(results_skip)} page(s)")
+        else:
+            print(f"\nSkipped (within backoff window): {len(results_skip)} pages")
+
+    if not args.ci:
+        print(f"\nTotal: {len(results_stale)} stale, {len(results_clean)} clean, {len(results_skip)} skipped")
+
+
 def cmd_extract_prompt(args):
     """Generate a structured LLM prompt for creating a wiki page."""
     from extract_prompt import generate_extraction_prompt
@@ -487,7 +665,7 @@ def build_parser():
     """Build the argparse parser with all subcommands."""
     parser = argparse.ArgumentParser(
         prog="wiki",
-        description="Antigravity Wiki v2 — LLM-native knowledge base engine",
+        description="LLM-native knowledge base engine",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -495,12 +673,17 @@ def build_parser():
     p_ingest = subparsers.add_parser("ingest", help="Full pipeline: extract → validate → link → lint → state")
     p_ingest.add_argument("source", help="Source file path")
     p_ingest.add_argument("--type", help="Source type (paper, article, transcript, code-doc)")
+    p_ingest.add_argument("--auto", action="store_true", help="Run LLM-powered auto-ingest (no manual collaboration required)")
+    p_ingest.add_argument("--no-retry", action="store_true", help="Skip retry loop on validation errors (trust first-pass output)")
+    p_ingest.add_argument("--fast", action="store_true", help="Alias for --no-retry (fast extraction without correction)")
+    p_ingest.add_argument("--mode", default="standard", choices=["standard", "gap"], help="Extraction mode: standard (full summary) or gap (fill gaps only)")
     p_ingest.set_defaults(func=cmd_ingest)
 
     # process (alias for ingest)
     p_process = subparsers.add_parser("process", help="Alias for ingest")
     p_process.add_argument("source", help="Source file path")
     p_process.add_argument("--type", help="Source type")
+    p_process.add_argument("--auto", action="store_true", help="Run LLM-powered auto-ingest")
     p_process.set_defaults(func=cmd_ingest)
 
     # extract
@@ -593,6 +776,26 @@ def build_parser():
     p_ep.add_argument("source", help="Source filename")
     p_ep.add_argument("--type", default="concept", help="Page type (default: concept)")
     p_ep.set_defaults(func=cmd_extract_prompt)
+
+    # recheck — smart recheck scheduling
+    p_recheck = subparsers.add_parser("recheck", help="Smart recheck scheduler management")
+    p_recheck_sub = p_recheck.add_subparsers(dest="recheck_action", help="Recheck action")
+
+    p_r_due = p_recheck_sub.add_parser("due", help="Show pages due for recheck")
+    p_r_due.add_argument("--confidence", help="Filter by confidence (HIGH, MEDIUM, LOW)")
+    p_r_due.add_argument("--limit", type=int, help="Limit to N pages")
+    p_r_due.set_defaults(func=cmd_recheck_due)
+
+    p_r_summary = p_recheck_sub.add_parser("summary", help="Show full recheck schedule")
+    p_r_summary.set_defaults(func=cmd_recheck_summary)
+
+    p_r_run = p_recheck_sub.add_parser("run", help="Run backoff-aware recheck on all tracked pages")
+    p_r_run.add_argument("--page", help="Recheck a specific page only")
+    p_r_run.add_argument("--ci", action="store_true", help="CI mode: suppress per-page progress output")
+    p_r_run.add_argument("--json", action="store_true", help="Output results as machine-parseable JSON")
+    p_r_run.set_defaults(func=cmd_recheck_run)
+
+    p_recheck.set_defaults(func=cmd_recheck)
 
     return parser
 

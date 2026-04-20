@@ -72,7 +72,7 @@ def test_get_page_type_config_unknown_raises(schema):
 def test_get_validation_rules(schema):
     """Validation rules contain expected entries with correct severities."""
     rules = get_validation_rules(schema)
-    assert rules["broken_links"]["severity"] == "ERROR"
+    assert rules["broken_links"]["severity"] == "WARNING"  # hybrid: forward wikilinks are graph edges, not blockers
     assert "stale_page" in rules
     assert "unmarked_inference" in rules
     assert "missing_content_hash" in rules

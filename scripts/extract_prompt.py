@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Extract Prompt Generator
+LLM Knowledge Base v2 — Extract Prompt Generator
 
 Generates a structured LLM prompt from SCHEMA.yaml for creating
 new wiki pages. Does NOT auto-generate content — produces a template

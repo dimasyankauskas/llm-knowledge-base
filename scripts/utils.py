@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Shared Utilities
+LLM Knowledge Base v2 — Shared Utilities
 Provides common functions for file operations, frontmatter parsing,
 wikilink extraction, typed relations, provenance sidecars, and graph management.
 """

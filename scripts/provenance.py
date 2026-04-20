@@ -1,4 +1,4 @@
-"""Provenance sidecar management for Antigravity Wiki v2.
+"""Provenance sidecar management for LLM Knowledge Base v2.
 
 Tracks claim-level evidence and detects staleness when source files change.
 """

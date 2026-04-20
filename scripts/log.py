@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Chronological Log
+LLM Knowledge Base v2 — Chronological Log
 
 Append-only journal tracking every pipeline operation.
 Implements the Karpathy LLM-Wiki `log.md` pattern.

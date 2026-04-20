@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Content Migration Script
+LLM Knowledge Base v2 — Content Migration Script
 
 Updates existing wiki pages to v2 format:
 - Adds missing frontmatter fields (content_hash, source_refs, confidence)
@@ -171,7 +171,7 @@ def create_provenance_sidecar(page_path: Path) -> bool:
 def migrate():
     """Run the full migration from v1 to v2 format."""
     print("=" * 60)
-    print("  Antigravity Wiki v2 — Content Migration")
+    print("  LLM Knowledge Base v2 — Content Migration")
     print("=" * 60)
     print()
 

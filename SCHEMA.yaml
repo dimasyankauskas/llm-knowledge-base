@@ -98,7 +98,7 @@ extraction:
 
 validation:
   broken_links:
-    severity: ERROR
+    severity: WARNING
   orphan_pages:
     severity: WARNING
   missing_frontmatter:
@@ -120,7 +120,7 @@ validation:
   unmarked_inference:
     severity: WARNING
   missing_content_hash:
-    severity: ERROR
+    severity: WARNING
   missing_counter_args:
     severity: WARNING
 

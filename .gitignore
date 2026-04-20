@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+.env
+
+# Build
+*.egg-info/
+dist/
+build/
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Wiki state (auto-generated — always rebuild from sources)
+wiki/_state.json
+wiki/_state_full.json
+wiki/_health.json
+wiki/_graph.json
+wiki/_log.md
+wiki/_last_query.json
+wiki/_recheck_schedules.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

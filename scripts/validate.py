@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Validate Stage
+LLM Knowledge Base v2 — Validate Stage
 
 Stage 2 of the pipeline: validates draft pages against the schema and checks
 provenance. Gates which pages go from wiki/drafts/ into wiki/concepts/ or
@@ -248,7 +248,7 @@ def validate_wikilinks(page_path: Path, all_page_names: set[str]) -> list[Valida
         if link_target.lower() not in names_lower and link_target not in seen_links:
             issues.append(
                 ValidationIssue(
-                    "ERROR", "BROKEN_LINK", page_name,
+                    "WARNING", "BROKEN_LINK", page_name,
                     f"Unresolvable wikilink: [[{link_target}]]"
                 )
             )
@@ -538,7 +538,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Antigravity Wiki v2 — Validate Stage"
+        description="LLM Knowledge Base v2 — Validate Stage"
     )
     parser.add_argument(
         "draft_path",

@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Link Stage
+LLM Knowledge Base v2 — Link Stage
 
 Stage 3 of the pipeline: resolve wikilinks, build typed graph,
 verify bidirectional links.

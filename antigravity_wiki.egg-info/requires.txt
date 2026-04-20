@@ -1,4 +1,0 @@
-python-frontmatter>=1.1.0
-pyyaml>=6.0
-rich>=13.9
-pymupdf>=1.25.0

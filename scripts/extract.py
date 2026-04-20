@@ -1,5 +1,5 @@
 """
-Antigravity Wiki v2 — Extract Stage
+LLM Knowledge Base v2 — Extract Stage
 
 Source registration and classification. Stage 1 of the pipeline.
 Replaces v1 ingest.py with cleaner v2 conventions.
@@ -335,7 +335,7 @@ def cmd_rebuild(args):
 def main():
     """CLI entry point with subcommands: register, check, rebuild"""
     parser = argparse.ArgumentParser(
-        description="Antigravity Wiki v2 — Extract Stage (source registration)",
+        description="LLM Knowledge Base v2 — Extract Stage (source registration)",
     )
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 

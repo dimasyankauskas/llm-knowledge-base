@@ -1,4 +1,4 @@
-"""Schema loader for Antigravity Wiki v2.
+"""Schema loader for LLM Knowledge Base v2.
 
 Provides accessor functions for the SCHEMA.yaml system constitution.
 """
