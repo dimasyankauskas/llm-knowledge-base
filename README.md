@@ -18,7 +18,7 @@ Karpathy's public gist introduced the core pattern: instead of retrieving from r
 
 ### [InfraNodus — Knowledge Graph Text Analysis](https://infranodus.com)
 
-InfraNodus可视化 any text as a knowledge graph, identifying gaps and structural weaknesses. The **gap-driven extraction mode** (`--mode gap`) in this project applies InfraNodus's insight — that knowing what you *don't* know is as valuable as knowing what you do — to the extraction pipeline. Two-pass extraction (gap analysis → targeted filling) is directly inspired by their research-oriented workflow.
+InfraNodus visualizes any text as a knowledge graph, identifying gaps and structural weaknesses. The **gap-driven extraction mode** (`--mode gap`) in this project applies InfraNodus's insight — that knowing what you *don't* know is as valuable as knowing what you do — to the extraction pipeline. Two-pass extraction (gap analysis → targeted filling) is directly inspired by their research-oriented workflow.
 
 ### [Obsidian — Local PKM with Wikilinks](https://obsidian.md)
 
