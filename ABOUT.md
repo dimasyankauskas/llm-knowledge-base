@@ -1,82 +1,90 @@
 # About LLM Knowledge Base
 
-LLM Knowledge Base is an agent-native wiki for durable project memory.
+LLM Knowledge Base is a local, agent-native wiki for durable project memory.
 
-It is designed for people who already work inside capable AI CLIs such as Codex, Claude Code, Gemini CLI, or similar tools. In that workflow, the active CLI agent is the intelligence: it reads sources, reasons about them, and writes atomic wiki pages. The wiki provides the durable substrate around that intelligence: source registration, schema validation, provenance, typed graph links, context packs, quality scoring, and maintenance triage.
+It is built for a simple reality: capable AI agents already know how to read, reason, and write. The missing layer is memory you can trust after the chat ends. This project gives agents and humans a shared substrate: source registration, schema validation, provenance, typed graph links, context packs, quality scoring, and maintenance triage.
 
-## Core Idea
+## The Problem
 
-Most AI work disappears into chat history. The next session has to rediscover the same facts, re-read the same documents, and rebuild the same mental model.
+Most AI work disappears into the session that produced it. The next agent has to re-read the same sources, rebuild the same context, and rediscover the same trade-offs. That is expensive in tokens, time, and attention.
 
-This project turns that work into reusable memory:
+Raw RAG helps retrieve text. It does not, by itself, turn a messy domain into a maintained body of knowledge.
+
+## The Product
+
+LLM Knowledge Base compiles source documents into an inspectable Markdown wiki:
 
 ```text
 source documents
   -> active CLI agent extracts atomic pages
-  -> wiki validates schema and provenance
-  -> graph/context packs become reusable agent memory
-  -> future agents start with grounded project knowledge
+  -> wiki validates schema, citations, and graph links
+  -> context packs become reusable agent memory
+  -> future agents start from grounded project knowledge
 ```
 
-## What Makes This Version Different
-
-The earlier direction centered on LLM-powered ingestion. That can work, but it makes the system fragile: model choice, timeout behavior, malformed frontmatter, and large-document truncation can dominate product quality.
-
-This version flips the default:
-
-```text
-CLI agent = reasoning and writing
-Wiki = memory, schema, provenance, graph, quality rails
-External model = optional unattended automation
-```
-
-The default command for new sources is:
+The default workflow is deliberately agent-first:
 
 ```bash
 wiki agent-ingest ./path/to/source.md --type article
 ```
 
-It does not call another model. It gives the current agent a source profile, merge candidates, citation rules, required page sections, and validation commands.
+That command does not call another model. It profiles the source, registers its hash, finds merge candidates, shows required sections, and gives the active CLI agent the exact validation path.
 
-## Who It Is For
+## What Makes This Version Different
 
-- AI CLI users who want project memory that survives across sessions.
-- Product strategists and researchers turning long documents into reusable concepts.
-- Engineering teams that want agent-readable context packs instead of ad hoc notes.
-- Agents that need grounded claims, source trails, graph relationships, and health status.
+The earlier direction centered on model-powered ingestion. That can work for unattended automation, but it makes the wrong thing central: model choice, timeout behavior, malformed frontmatter, and truncation can dominate the user experience.
+
+This version changes the center of gravity:
+
+```text
+CLI agent = reasoning and writing
+Wiki = memory, schema, provenance, graph, quality rails
+External model = optional automation
+```
+
+If you already have Codex, Claude Code, Gemini CLI, or another capable agent in the loop, the wiki should not compete with it. It should make that agent better.
 
 ## Human Value
 
-- Turns messy documents into clean, cited concept pages.
-- Preserves source provenance so claims remain inspectable.
-- Exposes gaps, stale pages, contradictions, and missing links.
-- Produces reusable briefs, case studies, playbooks, and decision memos.
-- Keeps private data local by default.
+- Turn long documents into clean, cited concept pages.
+- Keep source trails attached to the claims they support.
+- See gaps, stale pages, contradictions, thin pages, and missing links.
+- Produce reusable briefs, playbooks, case studies, and decision memos.
+- Keep private source data local by default.
 
 ## Agent Value
 
-- Provides fast model-free context via `wiki pack --json`.
-- Gives canonical facts and citation-backed claims.
-- Reduces repeated source reading and context-window waste.
-- Makes the knowledge base health visible before the agent relies on it.
-- Works from any CLI that can run shell commands and read/write files.
+- Retrieve fast, model-free context with `wiki pack --json`.
+- Start from canonical facts instead of re-reading every source.
+- See wiki health before relying on the knowledge base.
+- Use typed relationships to understand why concepts belong together.
+- Work from any CLI that can run shell commands and read/write files.
+
+## What It Is Not
+
+- Not a hosted product.
+- Not a vector database wrapper.
+- Not a second agent pretending to be smarter than the active agent.
+- Not a black box. The output is Markdown, JSON, YAML, and git-friendly files.
 
 ## Public Repo Policy
 
-The repository is published data-free by default:
+The repository is published as a clean template:
 
 - `sources/` contains only scaffolding and an empty manifest.
 - `wiki/` contains only empty runtime folders.
-- generated state, graph, health, logs, and private wiki content are ignored.
+- Generated state, graph, health, logs, and private wiki content are ignored.
+- `.venv/` is ignored and not part of the public repo.
 
-Users bring their own sources locally. Those sources and generated wiki pages should not be committed unless they are intentionally public.
+Users bring their own sources locally. Commit source files and generated wiki pages only when those documents are intentionally public.
 
 ## Optional Model Automation
 
-External/local models are still supported for unattended workflows:
+External or local models are still supported:
 
 ```bash
 wiki ingest ./path/to/source.md --auto
+wiki query "What does the wiki know about this?" --depth 2
 ```
 
-Use this when no active agent is supervising, or when you want a first-pass automated draft. For normal AI CLI work, prefer `wiki agent-ingest` plus direct agent extraction.
+Use these when no active agent is supervising, or when you want the wiki to synthesize an answer directly. For normal AI CLI work, prefer `wiki agent-ingest` and `wiki pack --json`.

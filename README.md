@@ -1,16 +1,45 @@
 # LLM Knowledge Base
 
-**A knowledge base that compounds.** Drop in raw sources — papers, articles, transcripts — and get structured, interlinked concept pages with cited facts and typed relationships. Your active CLI agent can handle extraction; the wiki provides durable memory, schema rails, provenance, graph retrieval, and quality checks.
+**Durable memory for AI agents and the people who work with them.**
+
+LLM Knowledge Base turns source documents into a local, schema-checked Markdown wiki: cited concept pages, typed relationships, provenance, health checks, and agent-ready context packs. It is built for CLI-first work. Codex, Claude Code, Gemini CLI, or any other capable agent does the reasoning and writing; the wiki supplies the memory layer, validation rails, and graph retrieval.
+
+This is not another chat history export. It is a project memory substrate you can inspect, version, query, and hand to the next agent without asking it to rediscover the same facts.
 
 ---
 
 ## Why This Exists
 
-Traditional RAG retrieves from raw documents every time you ask a question. Nothing builds up. Each query re-derives knowledge from scratch, and the LLM has no memory of what it already processed.
+Most AI work evaporates. You upload the same PDFs, paste the same notes, explain the same context, and the next session starts cold.
 
-This project takes a different approach, inspired by [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): knowledge gets compiled once into a persistent wiki, and queries traverse the pre-built graph. In a CLI-first workflow, the active agent is the extraction engine. Optional external models are automation helpers for unattended ingestion. Every source you add makes the whole wiki smarter. Contradictions get flagged. Connections accumulate. The compounding loop — source → agent extraction → wiki pages → context packs → better agent work — means each session can build durable knowledge instead of another disposable chat transcript.
+Traditional RAG helps retrieve raw chunks, but it does not automatically build a durable understanding of a domain. Every question can become a fresh re-read.
+
+This project takes a different path, inspired by [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): compile knowledge once into a persistent wiki, then let future agents query the graph. Contradictions get flagged. Thin pages become visible. Provenance stays attached. Each useful answer can be saved back into the wiki, so the system gets better instead of merely longer.
 
 Additional influences: [InfraNodus](https://infranodus.com) for gap-driven extraction, [Obsidian](https://obsidian.md) for the wikilink + local markdown format, and [LangChain](https://langchain.readthedocs.io) for graph-traversed retrieval patterns.
+
+## What It Is
+
+- **A local Markdown knowledge base** for sources, concepts, entities, timelines, and indexes.
+- **A validation system** that enforces frontmatter, required sections, citations, confidence levels, and graph connectivity.
+- **An agent context backend** that returns model-free JSON packs with relevant pages, claims, relationships, health status, and next actions.
+- **A provenance layer** that tracks which source files support which claims.
+- **A clean public template**: no bundled private data, no committed generated wiki content, no checked-in virtual environment.
+
+## What It Is Not
+
+- Not a hosted SaaS.
+- Not a vector database wrapper.
+- Not a replacement for a capable agent.
+- Not a black-box ingestion pipeline that hides source quality.
+- Not a place to commit private corpora unless you intentionally want those sources public.
+
+## Who It Helps
+
+- **AI CLI users** who want project memory that survives across sessions.
+- **Researchers and product strategists** turning long documents into reusable concepts.
+- **Engineering teams** that want grounded context packs instead of ad hoc notes.
+- **Agents** that need cited facts, graph relationships, stale-page warnings, and missing-page cues before acting.
 
 ---
 
@@ -107,7 +136,7 @@ Sources → Ingest → Wiki Pages → Query → LLM Synthesis → Save Answer �
 
 This version is intentionally **model-optional**.
 
-If you are already working inside Codex, Claude Code, Gemini CLI, or another strong AI CLI, do not make the wiki call a second model by default. Use the active agent to read and write; use the wiki for durable memory, validation, provenance, graph context, and quality checks.
+If you are already working inside Codex, Claude Code, Gemini CLI, or another strong AI CLI, do not make the wiki call a second model by default. Use the active agent to read and write. Use the wiki for durable memory, validation, provenance, graph context, and quality checks.
 
 See `ABOUT.md` for the product philosophy and public-repo policy.
 
@@ -284,8 +313,8 @@ cd wikis/<name> && rm -rf .git && git init && git add -A && git commit -m "init:
 # 4. Set up Python environment
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -e .
 
-# 5. Ingest your first source
-wiki ingest sources/your-source.md --auto --no-retry
+# 5. Plan your first agent-led ingest
+wiki agent-ingest sources/articles/your-source.md --type article
 ```
 
 Each instance is independent: its own git history, its own sources, its own wiki graph. Cross-wiki linking isn't supported — each wiki is a self-contained knowledge domain.
@@ -329,13 +358,13 @@ llm-knowledge-base/
 │
 ├── sources/                  # Read-only source documents
 │   ├── manifest.json         # SHA-256 registry
-│   ├── article/
-│   ├── paper/
-│   ├── transcript/
-│   └── code-doc/
+│   ├── articles/
+│   ├── papers/
+│   ├── transcripts/
+│   └── code-docs/
 │
 ├── wiki/                     # AI-managed knowledge base
-│   ├── _state.json          # Page inventory, health, contradictions
+│   ├── _state.json          # Generated locally; ignored by git
 │   ├── concepts/            # Extracted concept pages
 │   ├── drafts/              # Staging: must pass validation to promote
 │   └── timelines/           # Auto-generated from dated events
@@ -391,26 +420,14 @@ Forward wikilinks (links to pages that don't exist yet) are **warnings, not erro
 
 ## For AI Agents
 
-The wiki is designed for LLM agent operation, not manual curation. External agents can use it as a knowledge backend:
+The wiki is designed for agent operation, not hand-maintained note gardening. The important commands do not require provider credentials:
 
 ```bash
-# Query with LLM synthesis — returns a structured, cited answer
-wiki query "What's the current state of agentic AI product strategy?" --depth 2
-
-# Skip expansion (keyword-only, fast)
-wiki query "What is agentic AI?" --depth 2 --no-expand
-
-# Show expanded queries (debug)
-wiki query "What is agentic AI?" --expand-only
-
-# Raw context only (for agents that synthesize themselves)
-wiki query "What is agentic AI?" --depth 2 --context-only
+# Agent-first source processing plan (model-free)
+wiki agent-ingest ./sources/articles/source.md --json
 
 # Agent-ready context pack (model-free JSON)
 wiki pack "What is agentic AI?" --depth 2 --json
-
-# Agent-first source processing plan (model-free)
-wiki agent-ingest ./sources/articles/source.md --json
 
 # Prioritized maintenance queue
 wiki triage --json
@@ -424,6 +441,14 @@ wiki save-answer "Agentic AI Product Strategy — 2026 Synthesis" --type concept
 ```
 
 For agents and CLIs that already have their own model, prefer `wiki agent-ingest` for new sources and `wiki pack --json` for existing knowledge. These commands return source metadata, merge candidates, relevant pages, citation-backed claims, graph relationships, health status, stale pages, missing pages, contradictions, and suggested next actions without requiring any provider credentials.
+
+Use `wiki query` when you explicitly want the wiki to call a configured model and synthesize an answer:
+
+```bash
+wiki query "What's the current state of agentic AI product strategy?" --depth 2
+wiki query "What is agentic AI?" --depth 2 --context-only
+wiki query "What is agentic AI?" --expand-only
+```
 
 The `wiki query` command:
 1. Scores all pages by keyword overlap with the query
