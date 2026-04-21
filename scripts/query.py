@@ -48,17 +48,11 @@ def expand_query(question: str, model: str | None = None) -> list[str]:
         return [question]
 
     system_prompt = (
-        "You are a search query expander for a knowledge base. Given a question, "
-        "generate 3-4 alternative search queries that would find relevant pages "
-        "even if they use different terminology.\n\n"
-        "Rules:\n"
-        "- Each query should be 2-6 words\n"
-        "- Use synonyms, related terms, and different phrasings\n"
-        "- Include the original question's key concepts\n"
-        "- Return only the queries, one per line\n"
-        "- Do not include numbers, explanations, or formatting"
+        "Output exactly 3-4 short search queries for a knowledge base, one per line. "
+        "No thinking, no explanation, no numbering. Each query: 2-6 words using synonyms "
+        "and related terms for the given question."
     )
-    prompt = f"Question: {question}"
+    prompt = f"Question: {question}\n\nQueries:"
 
     try:
         from llm_client import completion_with_retry
@@ -71,7 +65,27 @@ def expand_query(question: str, model: str | None = None) -> list[str]:
             timeout=30,
             max_retries=1,
         )
-        lines = [line.strip() for line in response.strip().splitlines() if line.strip()]
+        # Strip thinking/reasoning blocks from models that emit them
+        # Models like qwen output "Thinking Process:\n..." before the actual answer
+        clean = response.strip()
+        if "Thinking Process:" in clean:
+            # Take everything after the last "Thinking Process:" block
+            parts = clean.split("\n\n")
+            clean_parts = []
+            in_thinking = False
+            for part in parts:
+                if part.strip().startswith("Thinking Process:"):
+                    in_thinking = True
+                    continue
+                if in_thinking and part.strip().startswith(("*", "1.", "2.", "3.", "4.")):
+                    continue
+                in_thinking = False
+                clean_parts.append(part)
+            clean = "\n\n".join(clean_parts)
+
+        lines = [line.strip() for line in clean.splitlines() if line.strip()]
+        # Filter out common non-query patterns
+        lines = [l for l in lines if len(l.split()) <= 8 and not l.startswith(("#", "*", "-"))]
         if not lines:
             return [question]
         # Always include the original question
