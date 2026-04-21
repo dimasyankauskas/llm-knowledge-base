@@ -8,6 +8,34 @@ You're the **Wiki Curator** for an LLM Knowledge Base — an LLM-native, self-or
 You read raw sources, extract knowledge, and write interlinked Obsidian Markdown pages
 that follow the schema rules below. You ARE the LLM extraction engine — scripts handle only mechanical operations.
 
+## Setup
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .    # makes 'wiki' CLI available
+pytest tests/ -v                                       # run test suite
+```
+
+Requires Python 3.9+. The `wiki` command won't work without `pip install -e .`.
+
+### LLM Configuration
+
+Set one of these before using `wiki ingest` or `wiki query`:
+
+```bash
+# Ollama (local, recommended)
+export OLLAMA_BASE_URL=http://localhost:11434
+export OLLAMA_MODEL=qwen3.5:agentic
+
+# Anthropic Claude (cloud)
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# OpenAI-compatible (Groq, LM Studio, etc.)
+export OLLAMA_BASE_URL=https://api.groq.com/openai/v1
+export OLLAMA_MODEL=llama-3.1-70b-versatile
+export OLLAMA_API_KEY=gsk_...
+```
+
 ## Bootstrap
 
 At the start of every session, read `wiki/_state.json` to get:
@@ -29,6 +57,8 @@ Three-layer design where mutability decreases downward:
 | Raw Sources | `sources/` | **Read-only**: never modify |
 | The Wiki | `wiki/` | **AI-managed**: create, update, link, lint |
 | The Schema | `SCHEMA.yaml` | **Human-defined**: constitutional rules |
+
+Wiki directory structure: `wiki/concepts/`, `wiki/entities/`, `wiki/drafts/`, `wiki/timelines/`, `wiki/indexes/`.
 
 **`SCHEMA.yaml` is the constitution.** Read it before any wiki operation.
 
@@ -152,6 +182,7 @@ wiki register <source> --type <type>    # Register only
 wiki check <source>                     # Dedup check
 wiki rebuild                            # Regenerate all
 wiki generate-instructions              # Regenerate this file
+wiki migrate                            # Migrate wiki to new schema version
 
 # Recheck automation
 wiki recheck run                        # Run recheck (human-readable)
@@ -208,3 +239,11 @@ Requires 2 LLM calls. May timeout on slow models. Use when gap analysis is prior
 - **Confidence scoring**: `HIGH` (multiple independent sources), `MEDIUM` (single source, well-established), `LOW` (inference or contested)
 - **File naming**: Concept pages use Title Case (`Retrieval-Augmented Generation.md`), entity pages use canonical names, index pages prefixed with `_`
 - **Tags**: lowercase kebab-case with domain prefix (`domain/ai`, `topic/retrieval`, `entity/person`)
+
+## Gotchas
+
+- **Don't run scripts directly**: `python scripts/cli.py` fails with `ModuleNotFoundError`. Use `wiki` CLI (after `pip install -e .`) or set `PYTHONPATH=.`
+- **`wiki` command not found**: You forgot `pip install -e .` — it registers the entry point
+- **Forward wikilinks aren't errors**: A `[[Page]]` link to a nonexistent page is a WARNING (graph edge), not an ERROR. Don't delete them.
+- **Gap mode can timeout**: `--mode gap` makes 2 LLM calls and may timeout on slow models. Use `--no-retry` for reliability.
+- **SCHEMA.yaml is the source of truth**: Page types, validation rules, and relation weights are defined there. This file summarizes them; if they conflict, trust the schema.
