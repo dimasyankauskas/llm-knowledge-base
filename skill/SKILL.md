@@ -64,14 +64,20 @@ wiki ingest --auto --no-retry /path/to/source.pdf --type concept
 ### Query Pipeline
 
 ```bash
-# Query with graph traversal (BFS through typed edges)
+# Query with LLM synthesis (BFS through typed edges, then LLM synthesizes answer)
 wiki query "What is agentic UX?" --depth 2
 
+# Raw context only (no LLM call — for agents that synthesize themselves)
+wiki query "What is agentic UX?" --depth 2 --context-only
+
 # Options:
-# --depth N   : how many hops from seed pages (default: 2)
-# --top-k N  : number of seed pages (default: 5)
-# --json     : structured JSON output
+# --depth N       : how many hops from seed pages (default: 2)
+# --top-k N      : number of seed pages (default: 5)
+# --json         : structured JSON output (includes synthesized answer)
+# --context-only  : raw context output, skip LLM synthesis
 ```
+
+The query pipeline: seed pages → BFS traversal → context assembly → LLM synthesis → cited answer.
 
 ### Validation
 

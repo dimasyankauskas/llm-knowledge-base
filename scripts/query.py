@@ -271,14 +271,37 @@ def build_context(pages: list[dict], max_chars: int = 50_000) -> str:
     return "\n".join(context_parts)
 
 
+def synthesize_answer(question: str, context: str, model: str | None = None) -> str:
+    """Call LLM to synthesize an answer from wiki context."""
+    from llm_client import completion_with_retry
+
+    system_prompt = (
+        "You are a knowledge base query engine. Answer the user's question using ONLY "
+        "the provided wiki context. Cite sources using [source: filename, §section] format. "
+        "If the context doesn't contain enough information, say so explicitly. "
+        "Be concise, factual, and structured. Use markdown headers and bullet points."
+    )
+    prompt = f"## Question\n{question}\n\n## Wiki Context\n{context}\n\n## Answer\n"
+
+    return completion_with_retry(
+        prompt=prompt,
+        system_prompt=system_prompt,
+        model=model,
+        temperature=0.3,
+        max_tokens=4096,
+        timeout=180,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="LLM Knowledge Base v2 — Graph-Traversal Context Builder",
+        description="LLM Knowledge Base v2 — Graph-Traversal Query Engine",
     )
     parser.add_argument("question", help="Question to find context for")
     parser.add_argument("--depth", type=int, default=2, help="Link traversal depth (default: 2)")
     parser.add_argument("--top-k", type=int, default=5, help="Number of seed pages (default: 5)")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--context-only", action="store_true", help="Output raw context without LLM synthesis")
 
     args = parser.parse_args()
 
@@ -301,6 +324,24 @@ def main():
     traversed = traverse_typed_graph(seed_pages, graph, args.depth)
     context = build_context(traversed)
 
+    if args.context_only:
+        print(context)
+        sys.exit(0)
+
+    print(f"\n🔍 Question: {args.question}")
+    print(f"📄 Seed pages: {', '.join(p.stem for p in seed_pages)}")
+    print(f"🔗 Traversed: {len(traversed)} pages (depth={args.depth})")
+    print(f"📝 Context: {len(context):,} chars")
+    print(f"🧠 Synthesizing answer...\n")
+
+    try:
+        answer = synthesize_answer(args.question, context)
+        print(answer)
+    except Exception as e:
+        print(f"⚠️  LLM synthesis failed: {e}")
+        print("Falling back to raw context:\n")
+        print(context)
+
     if args.json:
         output = {
             "question": args.question,
@@ -308,14 +349,9 @@ def main():
             "traversed_pages": [{"page": r["page"].stem, "score": r["score"], "path": r["path"]} for r in traversed],
             "context_chars": len(context),
             "context": context,
+            "answer": answer,
         }
         print(json.dumps(output, indent=2, ensure_ascii=False))
-    else:
-        print(f"\n🔍 Question: {args.question}")
-        print(f"📄 Seed pages: {', '.join(p.stem for p in seed_pages)}")
-        print(f"🔗 Traversed: {len(traversed)} pages (depth={args.depth})")
-        print(f"📝 Context: {len(context):,} chars\n")
-        print(context)
 
 
 if __name__ == "__main__":

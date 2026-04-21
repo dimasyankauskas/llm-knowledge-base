@@ -166,10 +166,13 @@ wiki recheck-daemon [--interval 6]     # Daemon: run recheck on a timer
 When Claude Code or another AI agent works in this repo, use the wiki CLI to delegate knowledge operations:
 
 ```bash
-# Ask the wiki a question — gets graph-traversed context + sourced answers
+# Ask the wiki a question — LLM synthesizes a cited answer from wiki pages
 wiki query "question" --depth 2
 
-# Save the last query result as a wiki draft page
+# Raw context only (no LLM call — for agents that synthesize themselves)
+wiki query "question" --depth 2 --context-only
+
+# Save the last query result (including LLM synthesis) as a wiki draft page
 wiki save-answer "Title" --type concept
 
 # Ingest a new source file (fast mode — no retry loop)

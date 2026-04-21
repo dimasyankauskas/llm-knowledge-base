@@ -102,13 +102,32 @@ wiki ingest <source> --auto --no-retry
 wiki query "What is the relationship between agentic AI and edge computing?" --depth 2
 ```
 
-The query engine performs graph-traversed context retrieval — BFS from seed pages through typed edges, assembling a sourced context block. Results include provenance citations.
+The query engine performs **two operations**:
+
+1. **Graph traversal** — BFS from seed pages through typed edges, assembling a sourced context block
+2. **LLM synthesis** — calls the configured LLM to produce a structured, cited answer from the assembled context
+
+The LLM uses only the wiki pages as its source — no hallucination from training data. Every claim traces back to ingested documents.
+
+```bash
+# Raw context only (no LLM call, faster)
+wiki query "What is agentic AI?" --depth 2 --context-only
+
+# JSON output (includes synthesized answer)
+wiki query "What is agentic AI?" --depth 2 --json
+```
 
 ```bash
 wiki save-answer "Agentic AI and Edge Computing" --type concept
 ```
 
-The last query result persists as a schema-compliant draft page. The loop closes.
+The synthesized answer persists as a schema-compliant draft page. **This is the compounding loop** — every query can produce new knowledge that becomes part of the graph, making future queries richer.
+
+```
+Sources → Ingest → Wiki Pages → Query → LLM Synthesis → Save Answer → Wiki Pages
+                                    ↑                                              |
+                                    └──────────── The loop compounds ──────────────┘
+```
 
 ---
 
@@ -178,7 +197,8 @@ wiki health      # lint errors and warnings
 | `wiki ingest <source> --auto --no-retry` | Fast extraction (recommended) |
 | `wiki ingest <source> --auto` | Extraction with retry correction |
 | `wiki ingest <source> --auto --mode gap` | Gap-driven extraction (2 LLM calls) |
-| `wiki query "question" --depth 2` | Graph-traversed query |
+| `wiki query "question" --depth 2` | Graph-traversed query with LLM synthesis |
+| `wiki query "question" --context-only` | Raw context output (no LLM call) |
 | `wiki save-answer "Title" --type concept` | Persist last query as draft |
 | `wiki validate` | Promote zero-error drafts |
 | `wiki link` | Build typed relationship graph |
@@ -241,6 +261,59 @@ Knowledge quality is explicit, not implicit. `HIGH` pages (multiple independent 
 
 ---
 
+## Multi-Wiki Architecture
+
+Each knowledge domain gets its own wiki instance — a standalone clone of this repo with a customized `SCHEMA.yaml`. The schema is the constitution: change it, and the entire pipeline adapts. This means a research wiki can have different page types, confidence thresholds, and relation weights than a project-tracking wiki, while sharing the same extraction engine.
+
+```
+wikis/
+├── _template/          # Base template — clone this for new instances
+│   ├── SCHEMA.yaml     # Default schema (customize per domain)
+│   ├── scripts/        # Shared extraction engine
+│   ├── sources/        # Domain-specific raw sources
+│   └── wiki/           # Domain-specific extracted knowledge
+│
+├── mission400/         # Example: project-specific wiki
+├── research/           # Example: academic research wiki
+└── notes/              # Example: personal notes wiki
+```
+
+### Creating a New Wiki Instance
+
+```bash
+# 1. Copy the template
+cp -r wikis/_template wikis/<name>
+
+# 2. Initialize as its own repo
+cd wikis/<name> && rm -rf .git && git init && git add -A && git commit -m "init: <name> wiki"
+
+# 3. Customize SCHEMA.yaml for your domain
+#    — Add/remove page types, relation types, confidence levels
+#    — Adjust validation rules, section requirements, citation formats
+
+# 4. Set up Python environment
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+
+# 5. Ingest your first source
+wiki ingest sources/your-source.md --auto --no-retry
+```
+
+Each instance is independent: its own git history, its own sources, its own wiki graph. Cross-wiki linking is not supported — each wiki is a self-contained knowledge domain.
+
+### Customizing SCHEMA.yaml
+
+The schema controls everything the pipeline validates and extracts. Key customization points:
+
+| Section | What it controls |
+|---------|-----------------|
+| `page_types` | Define domain-specific page types (e.g., `project`, `decision`, `meeting`) |
+| `confidence_levels` | Adjust thresholds or add levels (e.g., `VERIFIED` for audited claims) |
+| `relation_types` | Add domain-specific edges (e.g., `blocks`, `depends_on`, `supersedes`) |
+| `validation` | Tune severity levels, adjust `min_outlinks`, set `threshold_days` |
+| `extraction.source_type_templates` | Define section templates for new source types |
+
+---
+
 ## Repository Structure
 
 ```
@@ -259,7 +332,7 @@ llm-knowledge-base/
 │   ├── link.py              # Typed graph builder
 │   ├── lint.py              # 12 structural checks
 │   ├── consolidate.py       # Duplicate merge + index generation
-│   ├── query.py             # Graph traversal + context assembly
+│   ├── query.py             # Graph traversal + LLM synthesis
 │   ├── refine.py            # Gap analysis + contradiction detection
 │   ├── provenance.py        # Sidecar CRUD + staleness detection
 │   ├── state.py             # _state.json generator
@@ -333,10 +406,13 @@ Forward wikilinks (links to pages that don't exist yet) are **warnings, not erro
 The wiki is designed to be operated by an LLM agent, not manually. External agents can use it as a knowledge backend:
 
 ```bash
-# Query with graph traversal (returns sourced synthesis)
+# Query with LLM synthesis (returns a structured, cited answer)
 wiki query "What is the current state of agentic AI product strategy?" --depth 2
 
-# Persist a useful answer
+# Raw context only (no LLM call — useful for agents that synthesize themselves)
+wiki query "What is agentic AI?" --depth 2 --context-only
+
+# Persist a useful synthesized answer as a new wiki page
 wiki save-answer "Agentic AI Product Strategy — 2026 Synthesis" --type concept
 ```
 
@@ -344,9 +420,10 @@ The `wiki query` command:
 1. Scores all pages by keyword overlap with the query
 2. BFS traversal from seed pages through typed edges
 3. Assembles a context block (max 50K chars)
-4. Returns structured output with source citations
+4. Calls the configured LLM to synthesize a structured answer with citations
+5. Saves the answer to `_last_query.json` for `save-answer` to persist
 
-Agents can run the full extraction loop autonomously — ingest sources, validate drafts, build the graph, query for synthesis, save answers back. The wiki compounds as a direct result of use.
+The compounding loop: ingest → query → synthesize → save → the wiki grows richer with every cycle.
 
 ---
 

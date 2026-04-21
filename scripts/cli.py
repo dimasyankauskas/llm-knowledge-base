@@ -158,13 +158,7 @@ def cmd_validate(args):
     for draft in sorted(drafts_dir.glob("*.md")):
         report = validate_draft(draft, schema)
         if not report.has_errors:
-            page_type = "concept"  # default; frontmatter may say otherwise
-            try:
-                post = read_page(draft)
-                page_type = post.metadata.get("type", "concept")
-            except Exception:
-                pass
-            if promote_draft(draft, page_type):
+            if promote_draft(draft, schema=schema):
                 promoted += 1
         else:
             errors += report.error_count
@@ -181,7 +175,7 @@ def cmd_link(args):
     graph = build_typed_graph(schema=schema)
     save_graph(graph)
 
-    missing = verify_bidirectional_links(graph)
+    missing = verify_bidirectional_links()
     if missing:
         print(f"Missing reverse links: {len(missing)}")
         for m in missing[:10]:
@@ -287,7 +281,9 @@ def cmd_health(args):
 
 
 def cmd_query(args):
-    """Graph traversal query."""
+    """Graph traversal query with LLM synthesis."""
+    from query import synthesize_answer
+
     pages = list_wiki_pages()
     if not pages:
         print("Wiki is empty. Ingest some sources first.")
@@ -305,7 +301,23 @@ def cmd_query(args):
     traversed = traverse_typed_graph(seed, graph, args.depth)
     context = build_context(traversed)
 
-    if args.json:
+    # LLM synthesis (unless --json or --context-only)
+    answer = None
+    if not getattr(args, "json", False) and not getattr(args, "context_only", False):
+        print(f"\n🔍 Question: {args.question}")
+        print(f"📄 Seed pages: {', '.join(p.stem for p in seed)}")
+        print(f"🔗 Traversed: {len(traversed)} pages (depth={args.depth})")
+        print(f"📝 Context: {len(context):,} chars")
+        print(f"🧠 Synthesizing answer...\n")
+        try:
+            answer = synthesize_answer(args.question, context)
+            print(answer)
+        except Exception as e:
+            print(f"⚠️  LLM synthesis failed: {e}")
+            print("Falling back to raw context:\n")
+            print(context)
+
+    if getattr(args, "json", False):
         output = {
             "question": args.question,
             "seed_pages": [p.stem for p in seed],
@@ -315,13 +327,11 @@ def cmd_query(args):
             ],
             "context_chars": len(context),
             "context": context,
+            "answer": answer,
         }
         print(json.dumps(output, indent=2, ensure_ascii=False))
-    else:
-        print(f"\nQuestion: {args.question}")
-        print(f"Seed pages: {', '.join(p.stem for p in seed)}")
-        print(f"Traversed: {len(traversed)} pages (depth={args.depth})")
-        print(f"Context: {len(context):,} chars\n")
+
+    if getattr(args, "context_only", False):
         print(context)
 
     # Save last query for save-answer command
@@ -331,6 +341,7 @@ def cmd_query(args):
         "seed_pages": [p.stem for p in seed],
         "traversed_pages": [{"page": r["page"].stem, "score": r["score"]} for r in traversed],
         "context": context,
+        "answer": answer,
     }
     (WIKI_DIR / "_last_query.json").write_text(
         json.dumps(last_query, indent=2, ensure_ascii=False), encoding="utf-8",
@@ -341,6 +352,7 @@ def cmd_query(args):
         "Seeds": ", ".join(p.stem for p in seed),
         "Traversed": f"{len(traversed)} pages",
         "Context": f"{len(context):,} chars",
+        "Synthesized": "yes" if answer else "no",
     })
 
 
@@ -494,23 +506,24 @@ def cmd_save_answer(args):
     confidence = args.confidence or "LOW"
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Build source_refs from traversed pages
     traversed_stems = [p["page"] for p in lq.get("traversed_pages", [])]
     source_refs = [f"[source: wiki query, §{stem}]" for stem in traversed_stems[:5]]
 
-    # Build draft content
+    # Use LLM-synthesized answer if available, otherwise fall back to context
+    answer = lq.get("answer", "")
+
     lines = []
     lines.append(f"## Definition\n")
     lines.append(f"Synthesized answer to: *{lq.get('question', '')}*\n")
-    lines.append("*[Edit this section with the actual definition]*\n")
-    lines.append(f"## Key Properties\n")
-    lines.append("- *[Fill in key properties from the query context]*\n")
-    lines.append(f"## How It Works\n")
-    # Include truncated context
-    context = lq.get("context", "")
-    if len(context) > 2000:
-        context = context[:2000] + "\n\n*[Context truncated — see full query output]*"
-    lines.append(f"{context}\n")
+    if answer:
+        lines.append(f"## Synthesis\n")
+        lines.append(f"{answer}\n")
+    else:
+        lines.append(f"## How It Works\n")
+        context = lq.get("context", "")
+        if len(context) > 2000:
+            context = context[:2000] + "\n\n*[Context truncated — see full query output]*"
+        lines.append(f"{context}\n")
     lines.append(f"## Relationships\n")
     for stem in traversed_stems:
         lines.append(f"- [[{stem}]]")
@@ -722,11 +735,12 @@ def build_parser():
     p_health.set_defaults(func=cmd_health)
 
     # query
-    p_query = subparsers.add_parser("query", help="Graph traversal query")
+    p_query = subparsers.add_parser("query", help="Graph traversal query with LLM synthesis")
     p_query.add_argument("question", help="Question to find context for")
     p_query.add_argument("--depth", type=int, default=2, help="Traversal depth (default: 2)")
     p_query.add_argument("--top-k", type=int, default=5, help="Number of seed pages")
     p_query.add_argument("--json", action="store_true", help="Output as JSON")
+    p_query.add_argument("--context-only", action="store_true", help="Output raw context without LLM synthesis")
     p_query.set_defaults(func=cmd_query)
 
     # find
