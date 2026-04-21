@@ -282,16 +282,38 @@ def cmd_health(args):
 
 def cmd_query(args):
     """Graph traversal query with LLM synthesis."""
-    from query import synthesize_answer
+    from query import synthesize_answer, expand_query, index_boost
 
     pages = list_wiki_pages()
     if not pages:
         print("Wiki is empty. Ingest some sources first.")
         return
 
-    seed = find_seed_pages(args.question, top_k=args.top_k)
+    # Query expansion
+    if getattr(args, "expand_only", False):
+        queries = expand_query(args.question)
+        print(f"Original: {args.question}")
+        print("Expanded queries:")
+        for i, q in enumerate(queries, 1):
+            marker = " (original)" if q == args.question else ""
+            print(f"  {i}. {q}{marker}")
+        return
+
+    if getattr(args, "no_expand", False):
+        queries = [args.question]
+    else:
+        queries = expand_query(args.question)
+
+    seed = find_seed_pages(queries, top_k=args.top_k)
     if not seed:
-        print("No relevant pages found.")
+        # Fallback: try index-only search
+        boosts = index_boost(args.question)
+        if boosts:
+            print(f"No keyword matches found. Index suggests: {', '.join(boosts.keys())}")
+            print("Try: wiki query with different terms, or wiki ingest new sources.")
+        else:
+            print("No relevant wiki pages found.")
+            print("Try: wiki query with different terms, or wiki ingest new sources.")
         return
 
     graph = {}
@@ -305,6 +327,8 @@ def cmd_query(args):
     answer = None
     if not getattr(args, "json", False) and not getattr(args, "context_only", False):
         print(f"\n🔍 Question: {args.question}")
+        if len(queries) > 1:
+            print(f"📝 Expanded: {', '.join(queries[1:])}")
         print(f"📄 Seed pages: {', '.join(p.stem for p in seed)}")
         print(f"🔗 Traversed: {len(traversed)} pages (depth={args.depth})")
         print(f"📝 Context: {len(context):,} chars")
@@ -320,6 +344,7 @@ def cmd_query(args):
     if getattr(args, "json", False):
         output = {
             "question": args.question,
+            "expanded_queries": queries if len(queries) > 1 else None,
             "seed_pages": [p.stem for p in seed],
             "traversed_pages": [
                 {"page": r["page"].stem, "score": r["score"], "path": r["path"]}
@@ -337,6 +362,7 @@ def cmd_query(args):
     # Save last query for save-answer command
     last_query = {
         "question": args.question,
+        "expanded_queries": queries if len(queries) > 1 else None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "seed_pages": [p.stem for p in seed],
         "traversed_pages": [{"page": r["page"].stem, "score": r["score"]} for r in traversed],
@@ -350,6 +376,7 @@ def cmd_query(args):
     # Log
     append_log("query", f'"{args.question}"', {
         "Seeds": ", ".join(p.stem for p in seed),
+        "Expanded": len(queries) > 1,
         "Traversed": f"{len(traversed)} pages",
         "Context": f"{len(context):,} chars",
         "Synthesized": "yes" if answer else "no",
@@ -741,6 +768,8 @@ def build_parser():
     p_query.add_argument("--top-k", type=int, default=5, help="Number of seed pages")
     p_query.add_argument("--json", action="store_true", help="Output as JSON")
     p_query.add_argument("--context-only", action="store_true", help="Output raw context without LLM synthesis")
+    p_query.add_argument("--no-expand", action="store_true", help="Skip query expansion (keyword-only)")
+    p_query.add_argument("--expand-only", action="store_true", help="Show expanded queries without running pipeline")
     p_query.set_defaults(func=cmd_query)
 
     # find

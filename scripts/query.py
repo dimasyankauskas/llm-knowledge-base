@@ -376,6 +376,8 @@ def main():
     parser.add_argument("--top-k", type=int, default=5, help="Number of seed pages (default: 5)")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--context-only", action="store_true", help="Output raw context without LLM synthesis")
+    parser.add_argument("--no-expand", action="store_true", help="Skip query expansion (keyword-only)")
+    parser.add_argument("--expand-only", action="store_true", help="Show expanded queries without running pipeline")
 
     args = parser.parse_args()
 
@@ -384,10 +386,35 @@ def main():
         print("Wiki is empty. Ingest some sources first.")
         sys.exit(0)
 
-    seed_pages = find_seed_pages(args.question, top_k=args.top_k)
+    # Query expansion
+    if args.expand_only:
+        if args.no_expand:
+            print("Error: --expand-only and --no-expand are mutually exclusive.")
+            sys.exit(1)
+        queries = expand_query(args.question)
+        print(f"Original: {args.question}")
+        print("Expanded queries:")
+        for i, q in enumerate(queries, 1):
+            marker = " (original)" if q == args.question else ""
+            print(f"  {i}. {q}{marker}")
+        sys.exit(0)
+
+    if args.no_expand:
+        queries = [args.question]
+    else:
+        queries = expand_query(args.question)
+
+    seed_pages = find_seed_pages(queries, top_k=args.top_k)
 
     if not seed_pages:
-        print("No relevant wiki pages found.")
+        # Fallback: try index-only search with original question
+        boosts = index_boost(args.question)
+        if boosts:
+            print(f"No keyword matches found. Index suggests: {', '.join(boosts.keys())}")
+            print("Try: wiki query with different terms, or wiki ingest new sources.")
+        else:
+            print("No relevant wiki pages found.")
+            print("Try: wiki query with different terms, or wiki ingest new sources.")
         sys.exit(0)
 
     # Load graph
@@ -403,6 +430,8 @@ def main():
         sys.exit(0)
 
     print(f"\n🔍 Question: {args.question}")
+    if len(queries) > 1:
+        print(f"📝 Expanded: {', '.join(queries[1:])}")
     print(f"📄 Seed pages: {', '.join(p.stem for p in seed_pages)}")
     print(f"🔗 Traversed: {len(traversed)} pages (depth={args.depth})")
     print(f"📝 Context: {len(context):,} chars")
@@ -419,6 +448,7 @@ def main():
     if args.json:
         output = {
             "question": args.question,
+            "expanded_queries": queries if len(queries) > 1 else None,
             "seed_pages": [p.stem for p in seed_pages],
             "traversed_pages": [{"page": r["page"].stem, "score": r["score"], "path": r["path"]} for r in traversed],
             "context_chars": len(context),
