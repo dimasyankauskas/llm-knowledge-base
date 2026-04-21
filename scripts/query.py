@@ -38,6 +38,57 @@ EDGE_WEIGHTS = {
 }
 
 
+def expand_query(question: str, model: str | None = None) -> list[str]:
+    """Expand a question into multiple search queries using LLM.
+
+    Returns a list of query strings including the original question.
+    Falls back to [question] if LLM is unavailable or returns invalid output.
+    """
+    if not question.strip():
+        return [question]
+
+    system_prompt = (
+        "You are a search query expander for a knowledge base. Given a question, "
+        "generate 3-4 alternative search queries that would find relevant pages "
+        "even if they use different terminology.\n\n"
+        "Rules:\n"
+        "- Each query should be 2-6 words\n"
+        "- Use synonyms, related terms, and different phrasings\n"
+        "- Include the original question's key concepts\n"
+        "- Return only the queries, one per line\n"
+        "- Do not include numbers, explanations, or formatting"
+    )
+    prompt = f"Question: {question}"
+
+    try:
+        from llm_client import completion_with_retry
+        response = completion_with_retry(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            model=model,
+            temperature=0.7,
+            max_tokens=256,
+            timeout=30,
+            max_retries=1,
+        )
+        lines = [line.strip() for line in response.strip().splitlines() if line.strip()]
+        if not lines:
+            return [question]
+        # Always include the original question
+        queries = [question] + lines
+        # Deduplicate while preserving order
+        seen = set()
+        unique = []
+        for q in queries:
+            q_lower = q.lower()
+            if q_lower not in seen:
+                seen.add(q_lower)
+                unique.append(q)
+        return unique[:5]  # Cap at 5 queries total
+    except Exception:
+        return [question]
+
+
 def index_boost(question: str, wiki_dir: Path | None = None) -> dict[str, float]:
     """Read _index.md and score each page by question-word overlap with its entry.
 

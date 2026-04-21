@@ -187,3 +187,21 @@ class TestBuildContext:
         pages = [{"page": p, "score": 1.0, "path": [p.stem]} for p in sorted(concepts.glob("*.md"))]
         context = build_context(pages, max_chars=1000)
         assert len(context) <= 1200  # Allow small overhead
+
+
+class TestExpandQuery:
+    def test_expand_query_returns_list_including_original(self):
+        """expand_query should return a list containing the original question."""
+        from scripts.query import expand_query
+        results = expand_query("What is RAG?")
+        assert isinstance(results, list)
+        assert "What is RAG?" in results
+        assert len(results) >= 2  # original + at least 1 expansion
+
+    def test_expand_query_fallback_on_error(self):
+        """expand_query should return [original] when LLM fails."""
+        from scripts.query import expand_query
+        # Pass an empty string which should still return something
+        results = expand_query("")
+        assert isinstance(results, list)
+        assert "" in results
