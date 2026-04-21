@@ -255,3 +255,60 @@ class TestMultiQueryScoring:
         )
         # Multi-query should find at least as many pages
         assert len(results_multi) >= len(results_single)
+
+
+from unittest.mock import patch
+
+
+class TestExpandQueryMocked:
+    def test_expand_query_calls_llm_with_correct_prompt(self):
+        """expand_query should call LLM with expansion system prompt."""
+        from scripts.query import expand_query
+
+        mock_response = "hiring recruitment\ntalent acquisition onboarding\nworkforce staffing"
+        with patch("llm_client.completion_with_retry", return_value=mock_response) as mock_llm:
+            result = expand_query("employment process")
+
+            assert mock_llm.called
+            # Original question should be first
+            assert "employment process" in result
+
+    def test_expand_query_deduplicates(self):
+        """expand_query should deduplicate similar queries."""
+        from scripts.query import expand_query
+
+        # LLM returns a line similar to the original
+        mock_response = "employment process\nhiring recruitment\ntalent acquisition"
+        with patch("llm_client.completion_with_retry", return_value=mock_response):
+            result = expand_query("employment process")
+
+            # Should not have duplicates (case-insensitive)
+            lower_results = [r.lower() for r in result]
+            assert len(lower_results) == len(set(lower_results))
+
+    def test_expand_query_caps_at_five(self):
+        """expand_query should return at most 5 queries."""
+        from scripts.query import expand_query
+
+        mock_response = "query1\nquery2\nquery3\nquery4\nquery5\nquery6\nquery7"
+        with patch("llm_client.completion_with_retry", return_value=mock_response):
+            result = expand_query("test question")
+
+            assert len(result) <= 5
+
+    def test_expand_query_fallback_on_exception(self):
+        """expand_query should return [original] when LLM raises an exception."""
+        from scripts.query import expand_query
+
+        with patch("llm_client.completion_with_retry", side_effect=RuntimeError("LLM unavailable")):
+            result = expand_query("what is RAG")
+
+            assert result == ["what is RAG"]
+
+    def test_expand_query_empty_string(self):
+        """expand_query should handle empty string input."""
+        from scripts.query import expand_query
+
+        result = expand_query("")
+
+        assert result == [""]
