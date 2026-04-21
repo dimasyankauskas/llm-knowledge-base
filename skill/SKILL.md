@@ -70,6 +70,12 @@ wiki ingest --auto --no-retry /path/to/source.pdf --type concept
 # Query with LLM synthesis (BFS through typed edges, then LLM produces answer)
 wiki query "What is agentic UX?" --depth 2
 
+# Skip expansion (keyword-only, fast)
+wiki query "What is agentic UX?" --depth 2 --no-expand
+
+# Show expanded queries (debug)
+wiki query "What is agentic UX?" --expand-only
+
 # Raw context only (no LLM call — for agents that synthesize themselves)
 wiki query "What is agentic UX?" --depth 2 --context-only
 

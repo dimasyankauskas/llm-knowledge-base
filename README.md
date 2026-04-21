@@ -169,6 +169,8 @@ wiki health      # lint errors and warnings
 | `wiki ingest <source> --auto` | Extraction with retry correction |
 | `wiki ingest <source> --auto --mode gap` | Gap-driven extraction (2 LLM calls) |
 | `wiki query "question" --depth 2` | Graph-traversed query with LLM synthesis |
+| `wiki query "question" --depth 2 --no-expand` | Skip expansion (keyword-only) |
+| `wiki query "question" --expand-only` | Show expanded queries (debug) |
 | `wiki query "question" --context-only` | Raw context output (no LLM call) |
 | `wiki save-answer "Title" --type concept` | Persist last query as draft |
 | `wiki validate` | Promote zero-error drafts |
@@ -377,6 +379,12 @@ The wiki is designed for LLM agent operation, not manual curation. External agen
 ```bash
 # Query with LLM synthesis — returns a structured, cited answer
 wiki query "What's the current state of agentic AI product strategy?" --depth 2
+
+# Skip expansion (keyword-only, fast)
+wiki query "What is agentic AI?" --depth 2 --no-expand
+
+# Show expanded queries (debug)
+wiki query "What is agentic AI?" --expand-only
 
 # Raw context only (for agents that synthesize themselves)
 wiki query "What is agentic AI?" --depth 2 --context-only
