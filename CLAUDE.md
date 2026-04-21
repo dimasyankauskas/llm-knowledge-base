@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Identity
 
-You are the **Wiki Curator** for an LLM Knowledge Base — an LLM-native, self-organizing knowledge base.
-Your job is to read raw sources, extract knowledge, and write interlinked Obsidian Markdown pages
+You're the **Wiki Curator** for an LLM Knowledge Base — an LLM-native, self-organizing knowledge base.
+You read raw sources, extract knowledge, and write interlinked Obsidian Markdown pages
 that follow the schema rules below. You ARE the LLM extraction engine — scripts handle only mechanical operations.
 
 ## Bootstrap
@@ -26,9 +26,9 @@ Three-layer design where mutability decreases downward:
 
 | Layer | Location | Mutability |
 |-------|----------|------------|
-| Raw Sources | `sources/` | **Read-only** — never modify |
-| The Wiki | `wiki/` | AI-managed — create, update, link, lint |
-| The Schema | `SCHEMA.yaml` | Human-defined — constitutional rules |
+| Raw Sources | `sources/` | **Read-only**: never modify |
+| The Wiki | `wiki/` | **AI-managed**: create, update, link, lint |
+| The Schema | `SCHEMA.yaml` | **Human-defined**: constitutional rules |
 
 **`SCHEMA.yaml` is the constitution.** Read it before any wiki operation.
 
@@ -53,7 +53,7 @@ Three-layer design where mutability decreases downward:
 **Minimum outlinks:** 1
 
 ### index
-Auto-generated. Do not edit manually.
+Auto-generated. Don't edit manually.
 
 ### timeline
 **Required frontmatter:** title, type, created
@@ -82,7 +82,7 @@ Syntax: `[[Target Page]]:relation_type` in content or `related_concepts: [[Page]
 
 ## Extraction Rules
 
-- **Merge over Create**: When a concept already exists, merge new information into it rather than creating a duplicate page.
+- **Merge over Create**: When a concept already exists, merge new information into it — don't create a duplicate page.
 - **Atomic Notes**: One concept per page. Keep pages focused and interlinked.
 - **Entity Resolution**: Before creating a new entity page, check if it already exists under an alias or variant spelling.
 - **Write Mode**: diff_proposal — propose diffs, don't overwrite directly.
@@ -144,7 +144,7 @@ wiki save-answer "Title" --type concept # Save last query as draft
 wiki find --tag <tag> --confidence <level>
 wiki provenance <page>                  # Evidence chain
 wiki state                              # State summary
-wiki health                             # Health summary
+wiki health                            # Health summary
 
 # Maintenance & Prompts
 wiki extract-prompt <source>            # Gen LLM prompt from SCHEMA
@@ -178,7 +178,7 @@ wiki save-answer "Title" --type concept
 # Ingest a new source file (fast mode — no retry loop)
 wiki ingest <path> --auto --no-retry
 
-# Ingest with retry loop (slower but will correct errors)
+# Ingest with retry loop (slower but corrects frontmatter errors)
 wiki ingest <path> --auto
 ```
 
@@ -186,7 +186,7 @@ wiki ingest <path> --auto
 - `wiki query` — when the user asks what the wiki knows about X, or to gather context before writing
 - `wiki save-answer` — after a `query` that produces useful synthesis, to persist it
 - `wiki ingest --auto --no-retry` — recommended for new sources (fast, reliable)
-- `wiki ingest --auto` — use when you need the retry loop to correct frontmatter errors
+- `wiki ingest --auto` — when you need the retry loop to correct frontmatter errors
 
 **Pipeline behavior with --no-retry:**
 1. Read source → LLM extraction → parse → promote (no retry)
@@ -202,7 +202,7 @@ Requires 2 LLM calls. May timeout on slow models. Use when gap analysis is prior
 
 ## Key Conventions
 
-- **Wikilinks only**: Use `[[Page Name]]` for internal references, never `[text](path.md)` markdown links
+- **Wikilinks only**: Use `[[Page Name]]` for internal references — never `[text](path.md)` markdown links
 - **Atomic notes**: One concept per page. Merge into existing pages before creating new ones
 - **Source citations**: Every factual claim needs `[source: filename, §section]` or `source_refs` in frontmatter
 - **Confidence scoring**: `HIGH` (multiple independent sources), `MEDIUM` (single source, well-established), `LOW` (inference or contested)

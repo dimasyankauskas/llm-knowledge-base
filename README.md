@@ -1,46 +1,16 @@
 # LLM Knowledge Base
 
-**An LLM-native knowledge base that compounds.**
-
-Feed it raw sources — papers, articles, transcripts — and it extracts structured, interlinked concept pages. Every fact is cited. Every relationship is typed. The LLM is the extraction engine; Python scripts handle only what deterministic code can verify.
-
-Built for engineers who think in systems, not in folders.
+**A knowledge base that compounds.** Drop in raw sources — papers, articles, transcripts — and get structured, interlinked concept pages with cited facts and typed relationships. The LLM handles extraction; Python scripts handle verification.
 
 ---
 
-## Inspiration & Related Work
+## Why This Exists
 
-This project synthesizes ideas from several sources that shaped its design:
+Traditional RAG retrieves from raw documents every time you ask a question. Nothing builds up. Each query re-derives knowledge from scratch, and the LLM has no memory of what it already processed.
 
-### [Andrej Karpathy — LLM Wiki (April 2026)](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+This project takes a different approach, inspired by [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): the LLM compiles knowledge once at ingest time, writes it into a persistent wiki, and queries traverse the pre-built graph. Every source you add makes the whole wiki smarter. Contradictions get flagged. Connections accumulate. The compounding loop — ingest → query → synthesize → save — means each answer can become a new page.
 
-Karpathy's public gist introduced the core pattern: instead of retrieving from raw documents at query time (traditional RAG), an LLM incrementally builds and maintains a persistent wiki. The key insight is that **the wiki is a compounding artifact** — cross-references accumulate, contradictions get flagged, and synthesis improves with every source ingested. This project directly implements Karpathy's three-layer architecture (Sources → Wiki → Schema) and his ingest/query/lint loop.
-
-### [InfraNodus — Knowledge Graph Text Analysis](https://infranodus.com)
-
-InfraNodus visualizes any text as a knowledge graph, identifying gaps and structural weaknesses. The **gap-driven extraction mode** (`--mode gap`) in this project applies InfraNodus's insight — that knowing what you *don't* know is as valuable as knowing what you do — to the extraction pipeline. Two-pass extraction (gap analysis → targeted filling) is directly inspired by their research-oriented workflow.
-
-### [Obsidian — Local PKM with Wikilinks](https://obsidian.md)
-
-The file format and graph semantics (typed `[[wikilinks]]`, local markdown storage, vault-based architecture) are modeled after Obsidian. The decision to use plain-text, future-proof markdown files with YAML frontmatter is a deliberate choice to remain compatible with the Obsidian ecosystem.
-
-### [LangChain + RAG — Retrieval-Augmented Generation](https://langchain.readthedocs.io)
-
-The query pipeline (`wiki query`) uses graph-traversed context retrieval, a hybrid of vector similarity and structured graph traversal — inspired by LangChain's combining of RAG with knowledge graphs. Typed edges with per-type weights are analogous to LangChain's edge filtering in graph RAG.
-
----
-
-## The Problem It Solves
-
-Most knowledge bases are either **too loose** (chaotic notes, no structure, impossible to query) or **too rigid** (manual curation bottlenecks, no LLM synergy). LLM Knowledge Base closes the loop:
-
-```
-Sources → LLM Extraction → Typed Graph → Queries → New Synthesis → Sources
-                                              ↑
-                                    The compounding loop
-```
-
-The wiki doesn't just store knowledge — it creates the conditions for knowledge to grow.
+Additional influences: [InfraNodus](https://infranodus.com) for gap-driven extraction, [Obsidian](https://obsidian.md) for the wikilink + local markdown format, and [LangChain](https://langchain.readthedocs.io) for graph-traversed retrieval patterns.
 
 ---
 
@@ -50,16 +20,14 @@ Three layers, ordered by decreasing mutability:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  SCHEMA.yaml           │  Constitution — defines what valid     │
-│                        │  pages look like, typed relations,      │
-│                        │  confidence rules, contradiction proto   │
+│  SCHEMA.yaml           │  Constitution — page types, relations,  │
+│                        │  confidence rules, validation            │
 ├─────────────────────────────────────────────────────────────────┤
-│  wiki/                 │  AI-managed workspace. Every page      │
-│                        │  is a typed wikilink node with          │
-│                        │  provenance sidecar                     │
+│  wiki/                 │  AI-managed workspace. Every page is a   │
+│                        │  typed wikilink node with provenance     │
 ├─────────────────────────────────────────────────────────────────┤
-│  sources/              │  Read-only ground truth. Immutable.    │
-│                        │  SHA-256 registered, never edited      │
+│  sources/              │  Read-only ground truth. SHA-256         │
+│                        │  registered, never edited               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,7 +41,7 @@ Three layers, ordered by decreasing mutability:
 
 ## How It Works
 
-### Extraction Pipeline
+### Ingest Pipeline
 
 ```
 wiki ingest <source> --auto --no-retry
@@ -96,32 +64,34 @@ wiki ingest <source> --auto --no-retry
                                                       └────────────┘
 ```
 
-### Query Loop
+### Query Pipeline
 
 ```bash
-wiki query "What is the relationship between agentic AI and edge computing?" --depth 2
+wiki query "What's the relationship between agentic AI and edge computing?" --depth 2
 ```
 
-The query engine performs **two operations**:
+Two operations run in sequence:
 
-1. **Graph traversal** — BFS from seed pages through typed edges, assembling a sourced context block
-2. **LLM synthesis** — calls the configured LLM to produce a structured, cited answer from the assembled context
+1. **Graph traversal** — BFS from seed pages through typed edges, assembling a sourced context block (up to 50K chars)
+2. **LLM synthesis** — the configured LLM produces a structured, cited answer using only wiki pages as source material
 
-The LLM uses only the wiki pages as its source — no hallucination from training data. Every claim traces back to ingested documents.
+Every claim in the synthesized answer traces back to an ingested document. No hallucination from training data.
 
 ```bash
-# Raw context only (no LLM call, faster)
+# Raw context only (skip LLM call, faster)
 wiki query "What is agentic AI?" --depth 2 --context-only
 
 # JSON output (includes synthesized answer)
 wiki query "What is agentic AI?" --depth 2 --json
 ```
 
+### The Compounding Loop
+
 ```bash
 wiki save-answer "Agentic AI and Edge Computing" --type concept
 ```
 
-The synthesized answer persists as a schema-compliant draft page. **This is the compounding loop** — every query can produce new knowledge that becomes part of the graph, making future queries richer.
+The synthesized answer persists as a schema-compliant draft page. This closes the loop — every query can produce new knowledge that becomes part of the graph.
 
 ```
 Sources → Ingest → Wiki Pages → Query → LLM Synthesis → Save Answer → Wiki Pages
@@ -134,10 +104,11 @@ Sources → Ingest → Wiki Pages → Query → LLM Synthesis → Save Answer �
 ## Setup
 
 ```bash
-git clone https://github.com/yourhandle/llm-knowledge-base.git
+git clone https://github.com/dimasyankauskas/llm-knowledge-base.git
 cd llm-knowledge-base
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### LLM Configuration
@@ -169,20 +140,20 @@ export OLLAMA_API_KEY=gsk_...
 ```
 
 > [!note]
-> The CLI entry point is `wiki`. After `pip install -e .`, run `wiki ingest`, `wiki query`, etc. without the `python scripts/` prefix.
+> The CLI entry point is `wiki`. After `pip install -e .`, run `wiki ingest`, `wiki query`, etc. directly.
 
 ---
 
 ## Quick Start
 
 ```bash
-# 1. Ingest a source — recommended: --no-retry (fast, reliable)
+# 1. Ingest a source (fast mode — recommended)
 wiki ingest sources/my-paper.pdf --auto --no-retry
 
-# 2. Ask what the wiki knows
+# 2. Ask a question — LLM synthesizes a cited answer
 wiki query "What does the wiki know about retrieval-augmented generation?"
 
-# 3. Save useful synthesis back as a concept page
+# 3. Save the synthesized answer as a new concept page
 wiki save-answer "RAG at Scale" --type concept
 
 # 4. Inspect the graph
@@ -213,7 +184,7 @@ wiki health      # lint errors and warnings
 
 ### Why typed wikilinks?
 
-Most wikis treat `[[links]]` as navigation. LLM Knowledge Base treats them as **graph edges with semantics**:
+Most wikis treat `[[links]]` as navigation. This project treats them as **graph edges with semantics**:
 
 ```
 [[Agentic AI]]:implements
@@ -221,7 +192,7 @@ Most wikis treat `[[links]]` as navigation. LLM Knowledge Base treats them as **
 [[UX Design Patterns]]:implements
 ```
 
-The type determines graph traversal weight. A `cites` edge (weight 4) contributes more context than a `trades_off` edge (weight 1). This lets queries traverse the graph by semantic direction.
+The type determines traversal weight. A `cites` edge (weight 4) contributes more context than a `trades_off` edge (weight 1). Queries follow semantic direction, not just proximity.
 
 ### Why schema-first?
 
@@ -253,17 +224,17 @@ The type determines graph traversal weight. A `cites` edge (weight 4) contribute
 }
 ```
 
-Every claim traces to its source file and section. Staleness detection compares `content_hash` against the live source — if the source changed, the page is flagged.
+Every claim traces to its source file and section. Staleness detection compares `content_hash` against the live source — if the source changed, the page gets flagged.
 
 ### Why confidence levels?
 
-Knowledge quality is explicit, not implicit. `HIGH` pages (multiple independent sources) carry different weight in synthesis than `LOW` pages (single inference). When contradictions are detected, confidence auto-downgrades to `LOW` and the conflict is tracked in `_contradictions.md`.
+Knowledge quality is explicit, not implicit. `HIGH` pages (multiple independent sources) carry different weight in synthesis than `LOW` pages (single inference). When contradictions surface, confidence auto-downgrades to `LOW` and the conflict gets tracked in `_contradictions.md`.
 
 ---
 
 ## Multi-Wiki Architecture
 
-Each knowledge domain gets its own wiki instance — a standalone clone of this repo with a customized `SCHEMA.yaml`. The schema is the constitution: change it, and the entire pipeline adapts. This means a research wiki can have different page types, confidence thresholds, and relation weights than a project-tracking wiki, while sharing the same extraction engine.
+Each knowledge domain gets its own wiki instance — a standalone clone with a customized `SCHEMA.yaml`. The schema is the constitution: change it, and the entire pipeline adapts. A research wiki can have different page types, confidence thresholds, and relation weights than a project-tracking wiki, while sharing the same extraction engine.
 
 ```
 wikis/
@@ -292,17 +263,15 @@ cd wikis/<name> && rm -rf .git && git init && git add -A && git commit -m "init:
 #    — Adjust validation rules, section requirements, citation formats
 
 # 4. Set up Python environment
-python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -e .
 
 # 5. Ingest your first source
 wiki ingest sources/your-source.md --auto --no-retry
 ```
 
-Each instance is independent: its own git history, its own sources, its own wiki graph. Cross-wiki linking is not supported — each wiki is a self-contained knowledge domain.
+Each instance is independent: its own git history, its own sources, its own wiki graph. Cross-wiki linking isn't supported — each wiki is a self-contained knowledge domain.
 
 ### Customizing SCHEMA.yaml
-
-The schema controls everything the pipeline validates and extracts. Key customization points:
 
 | Section | What it controls |
 |---------|-----------------|
@@ -319,7 +288,7 @@ The schema controls everything the pipeline validates and extracts. Key customiz
 ```
 llm-knowledge-base/
 ├── SCHEMA.yaml              # Page schema (constitution)
-├── CLAUDE.md                # AI agent instructions (auto-generated from SCHEMA)
+├── CLAUDE.md                # AI agent instructions
 ├── requirements.txt
 ├── pyproject.toml
 │
@@ -347,7 +316,7 @@ llm-knowledge-base/
 │   └── code-doc/
 │
 ├── wiki/                     # AI-managed knowledge base
-│   ├── _state.json          # Bootstrap: page inventory, health, contradictions
+│   ├── _state.json          # Page inventory, health, contradictions
 │   ├── concepts/            # Extracted concept pages
 │   ├── drafts/              # Staging: must pass validation to promote
 │   └── timelines/           # Auto-generated from dated events
@@ -366,7 +335,7 @@ llm-knowledge-base/
 3. else  →  Anthropic direct (requires ANTHROPIC_API_KEY)
 ```
 
-Provider detection is automatic. Set one environment variable and the right client is used.
+Provider detection is automatic. Set one environment variable and the right client kicks in.
 
 | Provider | Env vars needed | SDK |
 |----------|----------------|-----|
@@ -380,7 +349,7 @@ Provider detection is automatic. Set one environment variable and the right clie
 
 ## Validation Rules
 
-12 structural checks. ERROR means broken state — must fix before committing:
+12 structural checks. ERROR means broken state — fix before committing:
 
 | Check | Severity | Description |
 |-------|----------|-------------|
@@ -397,22 +366,22 @@ Provider detection is automatic. Set one environment variable and the right clie
 | `missing_content_hash` | WARNING | No hash in frontmatter |
 | `missing_counter_args` | WARNING | HIGH/MEDIUM page without counter-arguments section |
 
-Forward wikilinks (links to pages that don't exist yet) are **warnings, not errors**. The link is registered as a graph edge — the target page can be created later.
+Forward wikilinks (links to pages that don't exist yet) are **warnings, not errors**. The link registers as a graph edge — the target page can be created later.
 
 ---
 
 ## For AI Agents
 
-The wiki is designed to be operated by an LLM agent, not manually. External agents can use it as a knowledge backend:
+The wiki is designed for LLM agent operation, not manual curation. External agents can use it as a knowledge backend:
 
 ```bash
-# Query with LLM synthesis (returns a structured, cited answer)
-wiki query "What is the current state of agentic AI product strategy?" --depth 2
+# Query with LLM synthesis — returns a structured, cited answer
+wiki query "What's the current state of agentic AI product strategy?" --depth 2
 
-# Raw context only (no LLM call — useful for agents that synthesize themselves)
+# Raw context only (for agents that synthesize themselves)
 wiki query "What is agentic AI?" --depth 2 --context-only
 
-# Persist a useful synthesized answer as a new wiki page
+# Persist a synthesized answer as a new wiki page
 wiki save-answer "Agentic AI Product Strategy — 2026 Synthesis" --type concept
 ```
 

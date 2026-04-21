@@ -6,13 +6,13 @@ user-invocable: true
 
 # LLM Wiki Skill
 
-Add documents to a knowledge wiki, query the knowledge graph, and build structured interlinked concept pages — using plain language or automated pipelines.
+Add documents to a knowledge wiki, query the knowledge graph, and build structured interlinked concept pages. Works with plain language or automated pipelines.
 
 ## What This Skill Does
 
-1. **Ingest** — drop a source (PDF, article, transcript) → get structured wiki pages
-2. **Query** — ask questions against the knowledge graph
-3. **Link** — pages become typed graph nodes with relationship edges
+1. **Ingest**: drop a source (PDF, article, transcript) and get structured wiki pages
+2. **Query**: ask a question and get a synthesized, cited answer from the knowledge graph
+3. **Link**: pages become typed graph nodes with relationship edges
 
 ## For Humans (Plain Language)
 
@@ -26,10 +26,13 @@ wiki ingest --auto /path/to/source.pdf --type concept
 # Gap-driven ingestion (analyzes what's missing first)
 wiki ingest --auto --mode gap /path/to/source.pdf --type concept
 
-# Query the wiki
-wiki query "What does the wiki know about RAG?"
+# Ask the wiki a question — LLM synthesizes a cited answer
+wiki query "What does the wiki know about retrieval-augmented generation?"
 
-# Save a useful answer
+# Raw context only (no LLM call)
+wiki query "What does the wiki know about RAG?" --context-only
+
+# Save a useful synthesized answer as a concept page
 wiki save-answer "RAG at Scale" --type concept
 ```
 
@@ -64,7 +67,7 @@ wiki ingest --auto --no-retry /path/to/source.pdf --type concept
 ### Query Pipeline
 
 ```bash
-# Query with LLM synthesis (BFS through typed edges, then LLM synthesizes answer)
+# Query with LLM synthesis (BFS through typed edges, then LLM produces answer)
 wiki query "What is agentic UX?" --depth 2
 
 # Raw context only (no LLM call — for agents that synthesize themselves)
@@ -108,7 +111,7 @@ llm-wiki/
 │   ├── validate.py       # Draft validation
 │   ├── lint.py          # Structural checks
 │   ├── link.py          # Graph builder
-│   └── query.py         # Graph-traversal query
+│   └── query.py         # Graph-traversal query + LLM synthesis
 ├── sources/              # Read-only source documents
 └── wiki/                # Extracted knowledge base
     ├── concepts/        # Concept pages
@@ -155,8 +158,8 @@ Two-pass extraction:
 1. Analyze existing wiki for structural gaps
 2. Extract specifically to fill those gaps
 
-Requires 2 LLM calls — slower but useful for systematic coverage.
+Requires 2 LLM calls. Slower but useful for systematic coverage.
 
 ## Schema
 
-All rules live in `SCHEMA.yaml` at repo root — the constitution for all pages. Read it before modifying wiki structure.
+All rules live in `SCHEMA.yaml` at repo root. It's the constitution for all pages. Read it before modifying wiki structure.
