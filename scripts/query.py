@@ -132,8 +132,16 @@ def index_boost(question: str, wiki_dir: Path | None = None) -> dict[str, float]
     return boosts
 
 
-def find_seed_pages(question: str, wiki_dir: Path | None = None, top_k: int = 5) -> list[Path]:
+def find_seed_pages(
+    question: str | list[str],
+    wiki_dir: Path | None = None,
+    top_k: int = 5,
+) -> list[Path]:
     """Find seed pages relevant to a question using keyword + tag + alias matching.
+
+    Accepts either a single query string or a list of query strings.
+    When given a list, scores pages against each query and merges by
+    taking the maximum score per page across all variants.
 
     Scoring:
     - Index boost: +5 per question-word match in _index.md summary
@@ -147,8 +155,14 @@ def find_seed_pages(question: str, wiki_dir: Path | None = None, top_k: int = 5)
     if wiki_dir is None:
         wiki_dir = WIKI_DIR
 
-    # Get index-first boost scores
-    boosts = index_boost(question, wiki_dir)
+    # Normalize to list of queries
+    if isinstance(question, str):
+        queries = [question]
+    else:
+        queries = list(question)
+
+    if not queries:
+        return []
 
     # Collect pages from concepts and entities directories
     pages = []
@@ -160,51 +174,60 @@ def find_seed_pages(question: str, wiki_dir: Path | None = None, top_k: int = 5)
     if not pages:
         return []
 
-    question_words = set(question.lower().split())
-    scored: list[tuple[float, Path]] = []
+    # Score pages against all query variants, taking max score per page
+    best_scores: dict[Path, float] = {}
 
-    for page in pages:
-        if page.stem.startswith("_"):
-            continue
+    for q in queries:
+        question_words = set(q.lower().split())
 
-        try:
-            post = read_page(page)
-        except Exception:
-            continue
+        # Get index boost for this query
+        boosts = index_boost(q, wiki_dir)
 
-        score = 0.0
+        for page in pages:
+            if page.stem.startswith("_"):
+                continue
 
-        # Index boost (from _index.md summary matching)
-        score += boosts.get(page.stem, 0.0)
+            try:
+                post = read_page(page)
+            except Exception:
+                continue
 
-        # Title match
-        title = post.metadata.get("title", page.stem).lower()
-        title_words = set(title.split())
-        title_overlap = len(question_words & title_words)
-        score += title_overlap * 10
+            score = 0.0
 
-        # Alias match
-        for alias in post.metadata.get("aliases", []):
-            if alias.lower() in question.lower():
-                score += 8
+            # Index boost (from _index.md summary matching)
+            score += boosts.get(page.stem, 0.0)
 
-        # Tag match
-        for tag in post.metadata.get("tags", []):
-            tag_words = set(tag.replace("/", " ").replace("-", " ").split())
-            tag_overlap = len(question_words & tag_words)
-            score += tag_overlap * 3
+            # Title match
+            title = post.metadata.get("title", page.stem).lower()
+            title_words = set(title.split())
+            title_overlap = len(question_words & title_words)
+            score += title_overlap * 10
 
-        # Content keyword match (first 500 chars)
-        content_sample = post.content[:500].lower()
-        for word in question_words:
-            if len(word) > 3 and word in content_sample:
-                score += 1
+            # Alias match
+            for alias in post.metadata.get("aliases", []):
+                if alias.lower() in q.lower():
+                    score += 8
 
-        if score > 0:
-            scored.append((score, page))
+            # Tag match
+            for tag in post.metadata.get("tags", []):
+                tag_words = set(tag.replace("/", " ").replace("-", " ").split())
+                tag_overlap = len(question_words & tag_words)
+                score += tag_overlap * 3
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [page for _, page in scored[:top_k]]
+            # Content keyword match (first 500 chars)
+            content_sample = post.content[:500].lower()
+            for word in question_words:
+                if len(word) > 3 and word in content_sample:
+                    score += 1
+
+            if score > 0:
+                # Keep the best score across all query variants
+                if page not in best_scores or score > best_scores[page]:
+                    best_scores[page] = score
+
+    # Sort by best score descending
+    sorted_pages = sorted(best_scores.items(), key=lambda x: x[1], reverse=True)
+    return [page for page, _ in sorted_pages[:top_k]]
 
 
 def traverse_typed_graph(seed_pages: list[Path], graph: dict, depth: int = 2) -> list[dict]:

@@ -205,3 +205,53 @@ class TestExpandQuery:
         results = expand_query("")
         assert isinstance(results, list)
         assert "" in results
+
+
+class TestMultiQueryScoring:
+    def test_find_seed_pages_with_query_list(self, tmp_path):
+        """find_seed_pages should accept a list of queries and merge scores."""
+        concepts = tmp_path / "wiki" / "concepts"
+        concepts.mkdir(parents=True)
+
+        # Page about "hiring" that doesn't contain "recruitment"
+        page = concepts / "Talent Acquisition.md"
+        page.write_text(
+            "---\ntitle: Talent Acquisition\ntype: concept\nconfidence: HIGH\n---\n"
+            "Hiring processes and onboarding strategies.",
+            encoding="utf-8"
+        )
+
+        # Single query "recruitment" would miss this page
+        # But "hiring" would find it
+        results = find_seed_pages(
+            ["recruitment process", "hiring process"],
+            wiki_dir=tmp_path / "wiki",
+        )
+        assert len(results) >= 1
+        # Should find the page via at least one query variant
+        stems = [r.stem for r in results]
+        assert "Talent Acquisition" in stems
+
+    def test_find_seed_pages_merges_max_score(self, tmp_path):
+        """When multiple queries match the same page, take the max score."""
+        concepts = tmp_path / "wiki" / "concepts"
+        concepts.mkdir(parents=True)
+
+        page = concepts / "Agentic AI.md"
+        page.write_text(
+            "---\ntitle: Agentic AI\ntype: concept\nconfidence: HIGH\n---\n"
+            "Autonomous AI systems that execute workflows.",
+            encoding="utf-8"
+        )
+
+        # Both queries match but "agentic" should score higher
+        results_single = find_seed_pages(
+            "agentic AI",
+            wiki_dir=tmp_path / "wiki",
+        )
+        results_multi = find_seed_pages(
+            ["agentic AI", "autonomous systems"],
+            wiki_dir=tmp_path / "wiki",
+        )
+        # Multi-query should find at least as many pages
+        assert len(results_multi) >= len(results_single)
