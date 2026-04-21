@@ -121,7 +121,10 @@ Never silently overwrite conflicting information.
 ## CLI Commands
 
 ```bash
-# Full pipeline
+# Agent-first workflow (default inside a capable AI CLI)
+wiki agent-ingest <source> --type <type>
+
+# Register-only pipeline
 wiki ingest <source> --type <type>
 
 # Individual stages
@@ -135,8 +138,7 @@ wiki consolidate                        # Merge + indexes
 # Queries & Inspection
 wiki log [-n 10]                        # View chronological journal
 wiki query "question" --depth 2 [--json]
-wiki query "question" --depth 2 --no-expand  # Skip expansion (keyword-only)
-wiki query "question" --expand-only         # Show expanded queries (debug)
+wiki pack "question or task" --json      # Model-free context pack
 wiki save-answer "Title" --type concept # Save last query as draft
 wiki find --tag <tag> --confidence <level>
 wiki provenance <page>                  # Evidence chain
@@ -150,6 +152,8 @@ wiki check <source>                     # Dedup check
 wiki rebuild                            # Regenerate all
 wiki generate-instructions              # Regenerate this file
 ```
+
+Default workflow for new sources: run `wiki agent-ingest <source>`, read the source yourself, write atomic drafts in `wiki/drafts/`, then run `wiki validate`, `wiki rebuild`, `wiki quality --json`, and `wiki coverage <source> --json`. Use `wiki ingest --auto` only for unattended model-powered extraction.
 
 ## Key Conventions
 

@@ -93,6 +93,109 @@ class TestCLIQuery:
             assert "Seed pages" in captured.out
 
 
+class TestCLISubstrate:
+    def test_pack_json_outputs_context_pack(self, capsys):
+        """Pack --json should expose the context-pack contract."""
+        with patch("scripts.cli.build_context_pack") as mock_pack:
+            mock_pack.return_value = {
+                "schema_version": "1.0",
+                "query": "case studies",
+                "wiki": {"health": {"status": "ok", "errors": 0, "warnings": 0}},
+                "context": {"pages": [], "claims": []},
+                "warnings": {"missing_pages": [], "stale_pages": [], "contradictions": []},
+                "suggested_next_actions": [],
+            }
+            main(["pack", "case studies", "--json"])
+            mock_pack.assert_called_once()
+            captured = capsys.readouterr()
+            assert "schema_version" in captured.out
+
+    def test_agent_ingest_json_outputs_model_free_plan(self, capsys):
+        """Agent-ingest should expose a model-free active-agent workflow."""
+        with patch("scripts.cli.register_source") as mock_register, \
+             patch("scripts.cli.build_agent_ingest_plan") as mock_plan:
+            mock_register.return_value = Path("/tmp/sources/articles/case.md")
+            mock_plan.return_value = {
+                "schema_version": "1.0",
+                "mode": "agent-first",
+                "source": {"filename": "case.md"},
+                "agent_workflow": [],
+            }
+            main(["agent-ingest", "case.md", "--type", "article", "--json"])
+            mock_register.assert_called_once()
+            mock_plan.assert_called_once()
+            captured = capsys.readouterr()
+            assert '"mode": "agent-first"' in captured.out
+
+    def test_triage_json_outputs_queue(self, capsys):
+        """Triage --json should expose the maintenance queue contract."""
+        with patch("scripts.cli.build_triage") as mock_triage:
+            mock_triage.return_value = {
+                "schema_version": "1.0",
+                "status": "ok",
+                "counts": {"errors": 0, "warnings": 0},
+                "items": [],
+            }
+            main(["triage", "--json"])
+            mock_triage.assert_called_once()
+            captured = capsys.readouterr()
+            assert "items" in captured.out
+
+    def test_scaffold_calls_substrate(self, capsys):
+        """Scaffold should create a draft through substrate."""
+        with patch("scripts.cli.scaffold_page") as mock_scaffold:
+            mock_scaffold.return_value = Path("/tmp/Product Strategy.md")
+            main(["scaffold", "Product Strategy"])
+            mock_scaffold.assert_called_once()
+            captured = capsys.readouterr()
+            assert "Draft scaffolded" in captured.out
+
+    def test_draft_json_outputs_artifact(self, capsys):
+        """Draft --json should expose artifact details."""
+        with patch("scripts.cli.draft_artifact") as mock_draft:
+            mock_draft.return_value = {
+                "schema_version": "1.0",
+                "kind": "brief",
+                "topic": "Agentic UX Strategy",
+                "path": "wiki/drafts/Agentic UX Strategy brief.md",
+                "warnings": {"missing_pages": [], "stale_pages": []},
+                "content": "# Agentic UX Strategy Brief",
+            }
+            main(["draft", "brief", "--topic", "Agentic UX Strategy", "--json"])
+            mock_draft.assert_called_once()
+            captured = capsys.readouterr()
+            assert "Agentic UX Strategy" in captured.out
+
+    def test_quality_json_outputs_report(self, capsys):
+        """Quality --json should expose usefulness score."""
+        with patch("scripts.cli.page_quality") as mock_quality:
+            mock_quality.return_value = {
+                "scope": "wiki",
+                "score": 92,
+                "pages": [],
+                "lint": {"errors": 0, "warnings": 0, "by_code": {}},
+            }
+            main(["quality", "--json"])
+            mock_quality.assert_called_once_with(None)
+            captured = capsys.readouterr()
+            assert '"score": 92' in captured.out
+
+    def test_coverage_json_outputs_report(self, capsys):
+        """Coverage --json should expose source representation score."""
+        with patch("scripts.cli.source_coverage") as mock_coverage:
+            mock_coverage.return_value = {
+                "source": "case.md",
+                "score": 80,
+                "pages": [],
+                "claims": 3,
+                "sections": {"total": 2, "uncovered": [], "coverage_ratio": 1.0},
+            }
+            main(["coverage", "case.md", "--json"])
+            mock_coverage.assert_called_once_with("case.md")
+            captured = capsys.readouterr()
+            assert '"case.md"' in captured.out
+
+
 class TestCLIValidate:
     def test_validate_runs_on_drafts(self, tmp_path):
         """Validate subcommand should validate drafts."""

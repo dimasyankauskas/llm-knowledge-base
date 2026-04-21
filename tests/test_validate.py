@@ -15,6 +15,7 @@ from scripts.utils import (
     ENTITIES_DIR,
     write_page,
     write_provenance,
+    read_page,
     extract_wikilinks,
 )
 from scripts.validate import (
@@ -464,6 +465,66 @@ class TestPromoteDraft:
         assert new_path is not None
         assert new_path.exists()
         assert "entities" in str(new_path)
+
+    def test_promote_draft_merges_existing_page_sources(self, tmp_path):
+        """A draft with an existing title merges source_refs instead of losing prior evidence."""
+        schema = load_schema()
+        wiki_dir = tmp_path / "wiki"
+        concepts = wiki_dir / "concepts"
+        concepts.mkdir(parents=True, exist_ok=True)
+        (wiki_dir / "entities").mkdir(parents=True, exist_ok=True)
+
+        existing = concepts / "Test_Concept.md"
+        write_page(
+            existing,
+            {
+                "title": "Test Concept",
+                "type": "concept",
+                "confidence": "MEDIUM",
+                "created": "2025-01-01",
+                "source_refs": ["first.md"],
+                "content_hash": "oldhash",
+            },
+            _make_concept_content().replace("test.md", "first.md"),
+        )
+        write_provenance(existing, {
+            "page": "Test_Concept",
+            "content_hash": "oldhash",
+            "sources": [{"file": "first.md", "content_hash": "111"}],
+            "claims": [],
+            "derived_concepts": [],
+        })
+
+        draft = _make_draft(
+            tmp_path,
+            filename="Test_Concept.md",
+            metadata={
+                "title": "Test Concept",
+                "type": "concept",
+                "confidence": "HIGH",
+                "created": "2025-01-02",
+                "source_refs": ["second.md"],
+                "content_hash": "newhash",
+            },
+            content=_make_concept_content().replace("test.md", "second.md"),
+        )
+        write_provenance(draft, {
+            "page": "Test_Concept",
+            "content_hash": "newhash",
+            "sources": [{"file": "second.md", "content_hash": "222"}],
+            "claims": [],
+            "derived_concepts": [],
+        })
+
+        promoted = promote_draft(draft, schema=schema, wiki_dir=wiki_dir)
+
+        assert promoted == existing
+        assert not draft.exists()
+        post = read_page(existing)
+        assert post.metadata["source_refs"] == ["first.md", "second.md"]
+        prov = json.loads(existing.with_suffix(".md.provenance.json").read_text(encoding="utf-8"))
+        assert {source["file"] for source in prov["sources"]} == {"first.md", "second.md"}
+        assert prov["claims"]
 
 
 # ── ValidationIssue / ValidationReport ────────────────────────────────────────

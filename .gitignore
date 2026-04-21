@@ -26,6 +26,17 @@ wiki/_log.md
 wiki/_last_query.json
 wiki/_recheck_schedules.json
 
+# Wiki content + raw sources (publish repo data-free by default)
+wiki/concepts/
+wiki/entities/
+wiki/drafts/
+wiki/indexes/
+wiki/timelines/
+sources/articles/
+sources/papers/
+sources/transcripts/
+sources/code-docs/
+
 # OS
 .DS_Store
 Thumbs.db

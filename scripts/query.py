@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -100,7 +101,32 @@ def expand_query(question: str, model: str | None = None) -> list[str]:
                 unique.append(q)
         return unique[:5]  # Cap at 5 queries total
     except Exception:
-        return [question]
+        return _fallback_expansions(question)
+
+
+def _fallback_expansions(question: str) -> list[str]:
+    """Deterministic query expansion when no LLM is available."""
+    stopwords = {"what", "which", "where", "when", "why", "how", "is", "are", "the", "a", "an", "of", "to", "for"}
+    words = [
+        word
+        for word in re.sub(r"[^a-zA-Z0-9 ]+", " ", question).lower().split()
+        if len(word) > 2 and word not in stopwords
+    ]
+    expansions = [question]
+    if words:
+        expansions.append(" ".join(words[:5]))
+    if len(words) > 1:
+        expansions.append(" ".join(reversed(words[:5])))
+    if len(expansions) == 1:
+        expansions.append(question.lower())
+    seen: set[str] = set()
+    unique: list[str] = []
+    for expansion in expansions:
+        key = expansion.lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(expansion)
+    return unique
 
 
 def index_boost(question: str, wiki_dir: Path | None = None) -> dict[str, float]:

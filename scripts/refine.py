@@ -243,7 +243,7 @@ def generate_refinement_tasks(
     - task_type: "thin_page" | "contradiction" | "gap" | "stale" | "missing_counter_args"
     - severity: "high" | "medium" | "low"
     - page: page name (or source for gaps)
-    - details: dict with task-specific info
+    - details: dict with task specific info
     """
     if wiki_dir is None:
         wiki_dir = WIKI_DIR

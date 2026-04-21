@@ -142,6 +142,24 @@ def test_register_source_adds_to_manifest(tmp_path):
     assert manifest["sources"][0]["filename"] == "article.md"
 
 
+def test_register_source_repairs_empty_manifest(tmp_path):
+    """Registering into a clean {} manifest initializes required keys."""
+    source_file = tmp_path / "article.md"
+    source_file.write_text("# Test Article\n\nContent here.", encoding="utf-8")
+
+    manifest_path = tmp_path / "sources" / "manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text("{}", encoding="utf-8")
+
+    entry = register_source(source_file, "article", manifest_path=manifest_path)
+
+    assert entry is not None
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["version"] == "1.0"
+    assert manifest["description"] == "Registry of ingested sources"
+    assert len(manifest["sources"]) == 1
+
+
 def test_register_source_detects_duplicate(tmp_path):
     """Registering the same source twice detects the duplicate."""
     source_file = tmp_path / "article.md"

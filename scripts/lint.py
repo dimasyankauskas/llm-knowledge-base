@@ -48,6 +48,7 @@ from utils import (
     read_page,
     read_provenance,
 )
+from provenance import check_staleness as provenance_check_staleness
 
 
 # ── Data Structures ───────────────────────────────────────────────────────
@@ -374,17 +375,7 @@ def check_staleness(pages: list[Path], sources_dir: Path | None = None) -> list[
         if prov is None:
             continue
 
-        stale_sources: list[str] = []
-        for src in prov.get("sources", []):
-            src_file = src.get("file", "")
-            src_hash = src.get("content_hash", "")
-            filepath = sources_dir / src_file
-            if not filepath.exists():
-                stale_sources.append(src_file)
-                continue
-            current_hash = hash_file(filepath)
-            if current_hash != src_hash:
-                stale_sources.append(src_file)
+        stale_sources = provenance_check_staleness(prov, sources_dir)
 
         if stale_sources:
             issues.append(LintIssue(

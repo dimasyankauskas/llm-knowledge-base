@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "llm-knowledge-base"
 version = "2.0.0"
-description = "LLM Wiki — an LLM-native, self-organizing knowledge base with typed graph extraction"
+description = "Agent-native LLM Wiki: durable memory, provenance, typed graph context, and quality rails for AI CLIs"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}

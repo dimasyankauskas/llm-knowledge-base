@@ -152,6 +152,7 @@ def _starts_frontmatter(text: str) -> bool:
         or first.startswith("type:")
         or first.startswith("confidence:")
         or first.startswith("created:")
+        or first.startswith("content_hash:")
         or first.startswith("source_refs:")
         or first.startswith("entity_type:")
     )
@@ -237,7 +238,59 @@ def split_pages(raw_text: str) -> list[str]:
     if not pages:
         return [raw_text.strip()]
 
-    return pages
+    return _merge_frontmatter_only_fragments(pages)
+
+
+def _merge_frontmatter_only_fragments(pages: list[str]) -> list[str]:
+    """Attach orphan frontmatter fragments to the next page body.
+
+    Some models emit a tiny preliminary frontmatter block (often only
+    ``content_hash`` and ``type``) followed by the real frontmatter block. The
+    splitter can see that tiny block as its own page; for parsing we want one
+    page so parse_single_page can choose the richest block.
+    """
+    merged: list[str] = []
+    pending_fragments: list[str] = []
+
+    for page in pages:
+        if _is_frontmatter_only_fragment(page):
+            pending_fragments.append(_ensure_closed_frontmatter(page))
+            continue
+        if pending_fragments:
+            merged.append("\n\n".join(pending_fragments + [_ensure_closed_frontmatter(page)]))
+            pending_fragments = []
+        else:
+            merged.append(page)
+
+    if pending_fragments:
+        merged.extend(pending_fragments)
+    return merged
+
+
+def _is_frontmatter_only_fragment(page: str) -> bool:
+    stripped = page.strip()
+    if not stripped.startswith("---"):
+        return False
+    if re.search(r"^#{1,6}\s+", stripped, flags=re.MULTILINE):
+        return False
+    return _starts_frontmatter(stripped.lstrip("-\n "))
+
+
+def _ensure_closed_frontmatter(page: str) -> str:
+    """Ensure a page fragment that starts with frontmatter has a closing marker."""
+    stripped = page.strip()
+    if not stripped.startswith("---"):
+        return page
+    if re.search(r"^---\s*$", stripped, flags=re.MULTILINE):
+        # Opening marker counts too; require another marker after the first line.
+        markers = list(re.finditer(r"^---\s*$", stripped, flags=re.MULTILINE))
+        if len(markers) >= 2:
+            return page
+
+    heading = re.search(r"^#{1,6}\s+", page, flags=re.MULTILINE)
+    if heading:
+        return page[:heading.start()].rstrip() + "\n---\n\n" + page[heading.start():].lstrip()
+    return page.rstrip() + "\n---"
 
 
 def parse_multi_page_response(

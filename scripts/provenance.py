@@ -6,12 +6,17 @@ Tracks claim-level evidence and detects staleness when source files change.
 from __future__ import annotations
 
 import sys
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from utils import hash_file, read_provenance
+from utils import hash_file, read_page, read_provenance, write_provenance
+
+
+SOURCE_REF_PATTERN = re.compile(r"\[source:\s*([^,\]]+),\s*§([^\]]+)\]")
+SECTION_PATTERN = re.compile(r"^##\s+(.+)$")
 
 
 def create_provenance(page: str, content_hash: str, sources: list[dict] | None = None) -> dict:
@@ -65,6 +70,116 @@ def add_claim(
     }
     prov["claims"].append(claim)
     return prov
+
+
+def merge_provenance(existing: dict | None, incoming: dict | None, page: str, content_hash: str) -> dict:
+    """Merge two provenance sidecars without duplicating sources or claims."""
+    merged = create_provenance(page=page, content_hash=content_hash)
+
+    source_keys: set[tuple[str, str]] = set()
+    for prov in (existing or {}, incoming or {}):
+        for source in prov.get("sources", []):
+            key = (str(source.get("file", "")), str(source.get("content_hash", "")))
+            if not key[0] or key in source_keys:
+                continue
+            source_keys.add(key)
+            merged["sources"].append(source)
+
+    claim_keys: set[tuple[str, tuple[str, ...]]] = set()
+    for prov in (existing or {}, incoming or {}):
+        for claim in prov.get("claims", []):
+            sources = tuple(sorted(str(src) for src in claim.get("sources", [])))
+            key = (str(claim.get("text", "")), sources)
+            if not key[0] or key in claim_keys:
+                continue
+            claim_keys.add(key)
+            new_claim = dict(claim)
+            new_claim["id"] = f"claim-{len(merged['claims']) + 1}"
+            merged["claims"].append(new_claim)
+
+    derived: list[str] = []
+    for prov in (existing or {}, incoming or {}):
+        for concept in prov.get("derived_concepts", []):
+            if concept not in derived:
+                derived.append(concept)
+    merged["derived_concepts"] = derived
+    return merged
+
+
+def extract_claims_from_page(page_path: Path, max_claims: int | None = None) -> list[dict]:
+    """Extract cited claim lines from a page into provenance-ready records."""
+    try:
+        post = read_page(page_path)
+    except Exception:
+        return []
+
+    claims: list[dict] = []
+    confidence = post.metadata.get("confidence", "MEDIUM")
+    current_section = ""
+
+    for raw_line in post.content.splitlines():
+        line = raw_line.strip()
+        heading = SECTION_PATTERN.match(line)
+        if heading:
+            current_section = heading.group(1).strip()
+            continue
+        if not line or current_section == "Sources":
+            continue
+
+        refs = SOURCE_REF_PATTERN.findall(line)
+        if not refs:
+            continue
+
+        text = re.sub(r"^[-*]\s+", "", line).strip()
+        if text.startswith("[source:"):
+            continue
+        text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+        text = re.sub(r"\[source:\s*[^,\]]+,\s*§[^\]]+\]", "", text)
+        text = re.sub(r"\s+", " ", text).strip(" .")
+        if len(text) < 12:
+            continue
+
+        source_refs = [
+            {"source": source.strip(), "section": section.strip()}
+            for source, section in refs
+        ]
+        sources = sorted({ref["source"] for ref in source_refs})
+        claims.append({
+            "id": f"claim-{len(claims) + 1}",
+            "text": text,
+            "type": "fact",
+            "confidence": confidence,
+            "section": current_section,
+            "sources": sources,
+            "source_refs": source_refs,
+            "corroborated": len(sources) > 1,
+            "last_verified": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        })
+        if max_claims is not None and len(claims) >= max_claims:
+            break
+
+    return claims
+
+
+def refresh_page_claims(page_path: Path) -> dict | None:
+    """Refresh a page sidecar with claims extracted from inline citations."""
+    prov = read_provenance(page_path)
+    if prov is None:
+        return None
+    prov = dict(prov)
+    prov["claims"] = extract_claims_from_page(page_path)
+    write_provenance(page_path, prov)
+    return prov
+
+
+def refresh_all_claims(wiki_dir: Path) -> int:
+    """Refresh claim sidecars for all concept and entity pages."""
+    refreshed = 0
+    for subdir in ("concepts", "entities"):
+        for page_path in sorted((wiki_dir / subdir).glob("*.md")):
+            if refresh_page_claims(page_path) is not None:
+                refreshed += 1
+    return refreshed
 
 
 def add_source(

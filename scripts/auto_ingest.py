@@ -286,6 +286,25 @@ def auto_ingest(
     source_type = classify_source_type(source_path)
     source_content_hash = hash_content(source_text)
 
+    # Register/copy source into sources/ so provenance + staleness checks work.
+    # This keeps the wiki self-contained and avoids "stale" flags from missing sources.
+    try:
+        register_source(source_path, source_type=source_type)
+        # Keep provenance pointers stable by using the canonical sources/<dir>/ path
+        type_dir_map = {
+            "article": "articles",
+            "paper": "papers",
+            "transcript": "transcripts",
+            "code-doc": "code-docs",
+        }
+        source_dirname = type_dir_map.get(source_type, source_type)
+        canonical = SOURCES_DIR / source_dirname / source_path.name
+        if canonical.exists():
+            source_path = canonical
+    except Exception:
+        # Registration failures should not block extraction.
+        pass
+
     # Truncate source if very long (LLM context limits)
     MAX_SOURCE_CHARS = 100_000
     if len(source_text) > MAX_SOURCE_CHARS:

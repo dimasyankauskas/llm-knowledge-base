@@ -1,2 +1,0 @@
-[console_scripts]
-wiki = scripts.cli:main

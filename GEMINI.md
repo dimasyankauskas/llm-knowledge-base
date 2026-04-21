@@ -28,12 +28,12 @@ export OLLAMA_BASE_URL=http://localhost:11434
 export OLLAMA_MODEL=qwen3.5:agentic
 
 # Anthropic Claude (cloud)
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=<your-anthropic-api-key>
 
 # OpenAI-compatible (Groq, LM Studio, etc.)
 export OLLAMA_BASE_URL=https://api.groq.com/openai/v1
 export OLLAMA_MODEL=llama-3.1-70b-versatile
-export OLLAMA_API_KEY=gsk_...
+export OLLAMA_API_KEY=<your-openai-compatible-api-key>
 ```
 
 ## Bootstrap
@@ -150,10 +150,13 @@ Never silently overwrite conflicting information.
 ## CLI Commands
 
 ```bash
-# Full pipeline (recommended: add --no-retry to skip retry loop)
+# Agent-first workflow (default when an AI CLI is already active)
+wiki agent-ingest <source> --type <type>
+
+# Register-only pipeline
 wiki ingest <source> --type <type>
 
-# Fast extraction (no retry loop, trust first-pass output)
+# Optional unattended extraction (calls configured external/local model)
 wiki ingest <source> --auto --no-retry
 
 # Gap-driven extraction (InfraNodus-style, 2 LLM calls, timeout risk)
@@ -170,6 +173,7 @@ wiki consolidate                       # Merge + indexes
 # Queries & Inspection
 wiki log [-n 10]                        # View chronological journal
 wiki query "question" --depth 2 [--json]
+wiki pack "question or task" --json      # Model-free context pack for agents
 wiki query "question" --depth 2 --no-expand  # Skip expansion (keyword-only)
 wiki query "question" --expand-only         # Show expanded queries (debug)
 wiki save-answer "Title" --type concept # Save last query as draft
@@ -208,7 +212,13 @@ wiki query "question" --depth 2 --context-only
 # Save the last query result (including LLM synthesis) as a wiki draft page
 wiki save-answer "Title" --type concept
 
-# Ingest a new source file (fast mode: no retry loop)
+# Create a model-free extraction plan for the active CLI agent
+wiki agent-ingest <path> --type article
+
+# Gather context without calling another model
+wiki pack "question or task" --depth 2 --json
+
+# Optional unattended ingest (only when you want the wiki to call a configured model)
 wiki ingest <path> --auto --no-retry
 
 # Ingest with retry loop (slower but corrects frontmatter errors)
@@ -216,16 +226,18 @@ wiki ingest <path> --auto
 ```
 
 **When to use each:**
+- `wiki agent-ingest`: default for new sources when the current CLI agent can read, reason, and write pages
+- `wiki pack --json`: default for retrieving existing wiki context without provider credentials
 - `wiki query`: when the user asks what the wiki knows about X, or to gather context before writing
 - `wiki save-answer`: after a `query` that produces useful synthesis, to persist it
-- `wiki ingest --auto --no-retry`: recommended for new sources (fast, reliable)
-- `wiki ingest --auto`: when you need the retry loop to correct frontmatter errors
+- `wiki ingest --auto --no-retry`: unattended model extraction when no active agent is supervising
+- `wiki ingest --auto`: unattended model extraction when you need the retry loop to correct frontmatter errors
 
-**Pipeline behavior with --no-retry:**
-1. Read source -> LLM extraction -> parse -> promote (no retry)
-2. Wikilinks: WARNING not ERROR (forward references become graph edges)
-3. content_hash: auto-populated if missing
-4. Schema-compliant output guaranteed by model quality
+**Agent-first behavior:**
+1. `wiki agent-ingest` registers/profiles a source, finds merge candidates, and prints schema/citation rules.
+2. The active CLI agent reads the source and writes atomic drafts into `wiki/drafts/`.
+3. `wiki validate` promotes zero-error drafts.
+4. `wiki rebuild`, `wiki quality --json`, and `wiki coverage <source> --json` verify the result.
 
 **Gap-driven mode (InfraNodus-style):**
 ```bash

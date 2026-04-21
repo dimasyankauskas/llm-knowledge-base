@@ -188,7 +188,10 @@ def generate_claude_md(
     lines.append("## CLI Commands")
     lines.append("")
     lines.append("```bash")
-    lines.append("# Full pipeline")
+    lines.append("# Agent-first workflow (default inside a capable AI CLI)")
+    lines.append("wiki agent-ingest <source> --type <type>")
+    lines.append("")
+    lines.append("# Register-only pipeline")
     lines.append("wiki ingest <source> --type <type>")
     lines.append("")
     lines.append("# Individual stages")
@@ -202,6 +205,7 @@ def generate_claude_md(
     lines.append("# Queries & Inspection")
     lines.append("wiki log [-n 10]                        # View chronological journal")
     lines.append("wiki query \"question\" --depth 2 [--json]")
+    lines.append("wiki pack \"question or task\" --json      # Model-free context pack")
     lines.append("wiki save-answer \"Title\" --type concept # Save last query as draft")
     lines.append("wiki find --tag <tag> --confidence <level>")
     lines.append("wiki provenance <page>                  # Evidence chain")
@@ -215,6 +219,8 @@ def generate_claude_md(
     lines.append("wiki rebuild                            # Regenerate all")
     lines.append("wiki generate-instructions              # Regenerate this file")
     lines.append("```")
+    lines.append("")
+    lines.append("Default workflow for new sources: run `wiki agent-ingest <source>`, read the source yourself, write atomic drafts in `wiki/drafts/`, then run `wiki validate`, `wiki rebuild`, `wiki quality --json`, and `wiki coverage <source> --json`. Use `wiki ingest --auto` only for unattended model-powered extraction.")
     lines.append("")
 
     # ── Key Conventions ──

@@ -17,7 +17,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
+from io import StringIO
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -42,6 +44,15 @@ from query import find_seed_pages, traverse_typed_graph, build_context
 from state import generate_state, generate_health, save_state, save_health, load_state, load_health
 from log import append_log
 from auto_ingest import auto_ingest as run_auto_ingest
+from substrate import (
+    build_agent_ingest_plan,
+    build_context_pack,
+    build_triage,
+    draft_artifact,
+    render_agent_ingest_plan,
+    scaffold_page,
+)
+from quality import page_quality, source_coverage
 
 DEFAULT_PAGE_TYPE = "concept"
 
@@ -219,7 +230,12 @@ def cmd_refine(args):
 
 def cmd_lint(args):
     """Run all 12 lint checks."""
-    issues = lint()
+    if args.json:
+        # Ensure machine-readable output: suppress lint's rich console output.
+        with redirect_stdout(StringIO()):
+            issues = lint()
+    else:
+        issues = lint()
     errors = sum(1 for i in issues if i.severity == "ERROR")
     warnings = sum(1 for i in issues if i.severity == "WARNING")
     if args.json:
@@ -274,7 +290,9 @@ def cmd_state(args):
 
 def cmd_health(args):
     """Print _health.json summary."""
-    issues = lint()
+    # Ensure machine-readable output: suppress lint's rich console output.
+    with redirect_stdout(StringIO()):
+        issues = lint()
     health = generate_health(lint_results=_lint_issues_to_dicts(issues))
     save_health(health)
     print(json.dumps(health, indent=2, ensure_ascii=False))
@@ -381,6 +399,146 @@ def cmd_query(args):
         "Context": f"{len(context):,} chars",
         "Synthesized": "yes" if answer else "no",
     })
+
+
+def cmd_pack(args):
+    """Build an agent-readable context pack without LLM synthesis."""
+    pack = build_context_pack(args.query, depth=args.depth, top_k=args.top_k)
+    if args.json:
+        print(json.dumps(pack, indent=2, ensure_ascii=False))
+        return
+
+    health = pack["wiki"]["health"]
+    print(f"Query: {pack['query']}")
+    print(f"Health: {health['status']} ({health['errors']} errors, {health['warnings']} warnings)")
+    print(f"Pages: {len(pack['context']['pages'])}")
+    for page in pack["context"]["pages"][:10]:
+        stale = " stale" if page.get("stale") else ""
+        print(f"  - {page['title']} [{page['type']}, {page['confidence']}]{stale}")
+    if pack["warnings"]["missing_pages"]:
+        print("\nMissing pages:")
+        for page in pack["warnings"]["missing_pages"][:10]:
+            print(f"  - {page}")
+    if pack["suggested_next_actions"]:
+        print("\nSuggested next actions:")
+        for action in pack["suggested_next_actions"][:10]:
+            print(f"  - {action}")
+
+
+def cmd_agent_ingest(args):
+    """Create a model-free ingestion plan for the active CLI agent."""
+    source = Path(args.source)
+    source_type = args.type or classify_source_type(source)
+    registered_path = None
+    if not args.no_register:
+        registered_path = register_source(source, source_type=source_type)
+
+    plan = build_agent_ingest_plan(
+        source,
+        source_type=source_type,
+        max_candidates=args.max_candidates,
+    )
+    if registered_path:
+        plan["registered_source"] = str(registered_path)
+
+    if args.json:
+        print(json.dumps(plan, indent=2, ensure_ascii=False))
+        return
+
+    if registered_path:
+        print(f"Registered source: {registered_path}\n")
+    print(render_agent_ingest_plan(plan))
+
+
+def cmd_triage(args):
+    """Build a prioritized maintenance queue."""
+    triage = build_triage()
+    if args.json:
+        print(json.dumps(triage, indent=2, ensure_ascii=False))
+        return
+
+    counts = triage["counts"]
+    print(f"Status: {triage['status']}")
+    print(
+        "Counts: "
+        f"{counts['errors']} errors, {counts['warnings']} warnings, "
+        f"{counts['stale_pages']} stale, {counts['missing_pages']} missing, "
+        f"{counts['contradictions']} contradictions"
+    )
+    if not triage["items"]:
+        print("No triage items.")
+        return
+    print("\nTop items:")
+    for item in triage["items"][:15]:
+        print(f"  [{item['priority']}] {item['type']}: {item['title']}")
+        print(f"      {item['reason']}")
+        print(f"      {item['command']}")
+
+
+def cmd_scaffold(args):
+    """Create a schema-valid draft stub for a missing page."""
+    try:
+        draft_path = scaffold_page(
+            args.title,
+            page_type=args.type,
+            source=args.source,
+            force=args.force,
+        )
+    except FileExistsError as exc:
+        print(str(exc))
+        return
+    print(f"Draft scaffolded: {draft_path}")
+
+
+def cmd_draft(args):
+    """Create an extractive work-product draft from wiki context."""
+    artifact = draft_artifact(args.kind, args.topic, audience=args.audience)
+    if args.json:
+        print(json.dumps(artifact, indent=2, ensure_ascii=False))
+        return
+    print(f"Draft created: {artifact['path']}")
+    if artifact["warnings"]["missing_pages"] or artifact["warnings"]["stale_pages"]:
+        print("Warnings:")
+        for page in artifact["warnings"]["missing_pages"][:5]:
+            print(f"  - Missing page: {page}")
+        for page in artifact["warnings"]["stale_pages"][:5]:
+            print(f"  - Stale page: {page}")
+
+
+def cmd_quality(args):
+    """Score wiki/page usefulness for agents and humans."""
+    report = page_quality(args.page)
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+    print(f"Quality: {report['score']}/100 ({report['scope']})")
+    lint_report = report["lint"]
+    print(f"Lint: {lint_report['errors']} errors, {lint_report['warnings']} warnings")
+    for page in report["pages"][:10]:
+        stale = " stale" if page["stale_sources"] else ""
+        print(
+            f"  - {page['title']}: {page['score']}/100, "
+            f"{page['claims']} claims, {page['citations']} citations{stale}"
+        )
+
+
+def cmd_coverage(args):
+    """Report how much of a source is represented in the wiki."""
+    report = source_coverage(args.source)
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+    sections = report["sections"]
+    print(f"Coverage: {report['score']}/100 for {report['source']}")
+    print(
+        f"Sections: {sections['coverage_ratio']:.0%} covered "
+        f"({sections['total'] - len(sections['uncovered'])}/{sections['total']})"
+    )
+    print(f"Claims: {report['claims']}; Pages: {len(report['pages'])}")
+    if sections["uncovered"]:
+        print("Uncovered sections:")
+        for section in sections["uncovered"][:10]:
+            print(f"  - {section}")
 
 
 def cmd_find(args):
@@ -771,6 +929,59 @@ def build_parser():
     p_query.add_argument("--no-expand", action="store_true", help="Skip query expansion (keyword-only)")
     p_query.add_argument("--expand-only", action="store_true", help="Show expanded queries without running pipeline")
     p_query.set_defaults(func=cmd_query)
+
+    # pack
+    p_pack = subparsers.add_parser("pack", help="Build an agent-readable context pack")
+    p_pack.add_argument("query", help="Question or task to gather context for")
+    p_pack.add_argument("--depth", type=int, default=2, help="Traversal depth (default: 2)")
+    p_pack.add_argument("--top-k", type=int, default=5, help="Number of seed pages")
+    p_pack.add_argument("--json", action="store_true", help="Output as JSON")
+    p_pack.set_defaults(func=cmd_pack)
+
+    # agent-ingest
+    p_agent_ingest = subparsers.add_parser(
+        "agent-ingest",
+        help="Create a model-free ingestion plan for the active CLI agent",
+    )
+    p_agent_ingest.add_argument("source", help="Source file path")
+    p_agent_ingest.add_argument("--type", help="Source type")
+    p_agent_ingest.add_argument("--json", action="store_true", help="Output as JSON")
+    p_agent_ingest.add_argument("--no-register", action="store_true", help="Do not register/copy the source")
+    p_agent_ingest.add_argument("--max-candidates", type=int, default=5, help="Merge candidates to include")
+    p_agent_ingest.set_defaults(func=cmd_agent_ingest)
+
+    # triage
+    p_triage = subparsers.add_parser("triage", help="Show prioritized wiki maintenance queue")
+    p_triage.add_argument("--json", action="store_true", help="Output as JSON")
+    p_triage.set_defaults(func=cmd_triage)
+
+    # scaffold
+    p_scaffold = subparsers.add_parser("scaffold", help="Create a schema-valid draft stub")
+    p_scaffold.add_argument("title", help="Page title to scaffold")
+    p_scaffold.add_argument("--type", default="concept", choices=["concept", "entity"], help="Page type")
+    p_scaffold.add_argument("--source", default="triage:missing-link", help="Reason/source for scaffold")
+    p_scaffold.add_argument("--force", action="store_true", help="Overwrite an existing draft")
+    p_scaffold.set_defaults(func=cmd_scaffold)
+
+    # draft
+    p_draft = subparsers.add_parser("draft", help="Create a cited work-product draft")
+    p_draft.add_argument("kind", choices=["brief", "case-study", "playbook", "decision-memo"], help="Draft type")
+    p_draft.add_argument("--topic", required=True, help="Topic to draft from wiki context")
+    p_draft.add_argument("--audience", help="Target audience")
+    p_draft.add_argument("--json", action="store_true", help="Output as JSON")
+    p_draft.set_defaults(func=cmd_draft)
+
+    # quality
+    p_quality = subparsers.add_parser("quality", help="Score wiki/page usefulness")
+    p_quality.add_argument("page", nargs="?", help="Optional page title/stem")
+    p_quality.add_argument("--json", action="store_true", help="Output as JSON")
+    p_quality.set_defaults(func=cmd_quality)
+
+    # coverage
+    p_coverage = subparsers.add_parser("coverage", help="Report source coverage")
+    p_coverage.add_argument("source", help="Source filename/path")
+    p_coverage.add_argument("--json", action="store_true", help="Output as JSON")
+    p_coverage.set_defaults(func=cmd_coverage)
 
     # find
     p_find = subparsers.add_parser("find", help="Filter pages by metadata")

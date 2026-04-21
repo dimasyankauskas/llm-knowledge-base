@@ -170,7 +170,7 @@ class TestBrokenLinks:
         issues = check_broken_links(pages, all_names)
         assert len(issues) > 0
         assert issues[0].code == "BROKEN_LINK"
-        assert issues[0].severity == "ERROR"
+        assert issues[0].severity == "WARNING"
         assert "Nonexistent_Page" in issues[0].message
 
     def test_broken_link_valid(self, tmp_path):

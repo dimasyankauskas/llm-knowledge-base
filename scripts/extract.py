@@ -170,15 +170,29 @@ def register_source(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     else:
         manifest = load_manifest()
+    if not isinstance(manifest, dict):
+        manifest = {}
+    manifest.setdefault("version", "1.0")
+    manifest.setdefault("description", "Registry of ingested sources")
+    manifest.setdefault("sources", [])
 
     # Check for duplicates
-    if any(s.get("content_hash") == content_hash for s in manifest.get("sources", [])):
+    if any(s.get("content_hash") == content_hash for s in manifest["sources"]):
         return None
+
+    # Map source_type -> on-disk folder name (repo uses pluralized dirs)
+    type_dir_map = {
+        "article": "articles",
+        "paper": "papers",
+        "transcript": "transcripts",
+        "code-doc": "code-docs",
+    }
+    source_dirname = type_dir_map.get(source_type, source_type)
 
     # Copy source to sources/<type>/ if not already there
     sources_dir = manifest_path.parent if manifest_path else SOURCES_DIR
     if not str(source_path.resolve()).startswith(str(sources_dir.resolve())):
-        dest = sources_dir / source_type / source_path.name
+        dest = sources_dir / source_dirname / source_path.name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_path, dest)
         source_path = dest

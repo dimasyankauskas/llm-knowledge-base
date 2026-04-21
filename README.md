@@ -1,6 +1,6 @@
 # LLM Knowledge Base
 
-**A knowledge base that compounds.** Drop in raw sources — papers, articles, transcripts — and get structured, interlinked concept pages with cited facts and typed relationships. The LLM handles extraction; Python scripts handle verification.
+**A knowledge base that compounds.** Drop in raw sources — papers, articles, transcripts — and get structured, interlinked concept pages with cited facts and typed relationships. Your active CLI agent can handle extraction; the wiki provides durable memory, schema rails, provenance, graph retrieval, and quality checks.
 
 ---
 
@@ -8,7 +8,7 @@
 
 Traditional RAG retrieves from raw documents every time you ask a question. Nothing builds up. Each query re-derives knowledge from scratch, and the LLM has no memory of what it already processed.
 
-This project takes a different approach, inspired by [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): the LLM compiles knowledge once at ingest time, writes it into a persistent wiki, and queries traverse the pre-built graph. Every source you add makes the whole wiki smarter. Contradictions get flagged. Connections accumulate. The compounding loop — ingest → query → synthesize → save — means each answer can become a new page.
+This project takes a different approach, inspired by [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): knowledge gets compiled once into a persistent wiki, and queries traverse the pre-built graph. In a CLI-first workflow, the active agent is the extraction engine. Optional external models are automation helpers for unattended ingestion. Every source you add makes the whole wiki smarter. Contradictions get flagged. Connections accumulate. The compounding loop — source → agent extraction → wiki pages → context packs → better agent work — means each session can build durable knowledge instead of another disposable chat transcript.
 
 Additional influences: [InfraNodus](https://infranodus.com) for gap-driven extraction, [Obsidian](https://obsidian.md) for the wikilink + local markdown format, and [LangChain](https://langchain.readthedocs.io) for graph-traversed retrieval patterns.
 
@@ -41,15 +41,15 @@ Three layers, ordered by decreasing mutability:
 
 ## How It Works
 
-### Ingest Pipeline
+### Agent-First Ingest Pipeline
 
 ```
-wiki ingest <source> --auto --no-retry
+wiki agent-ingest <source>
         │
         ▼
 ┌─────────────┐    ┌──────────────┐    ┌────────────┐    ┌──────────┐
-│  REGISTER   │───▶│   EXTRACT    │───▶│  VALIDATE  │───▶│   LINK   │
-│  source     │    │  LLM writes  │    │  promote   │    │  graph   │
+│  REGISTER   │───▶│ ACTIVE AGENT │───▶│  VALIDATE  │───▶│   LINK   │
+│  source     │    │  writes      │    │  promote   │    │  graph   │
 │  SHA-256    │    │  draft pages │    │  if zero   │    │  edges   │
 │  manifest   │    │  with schema │    │  errors    │    │  from    │
 │             │    │  frontmatter │    │            │    │  wikilinks
@@ -63,6 +63,8 @@ wiki ingest <source> --auto --no-retry
                                                       │  → publish │
                                                       └────────────┘
 ```
+
+`wiki agent-ingest` does not call another model. It gives the current CLI agent a source profile, merge candidates, schema contract, citation format, and exact validation commands. Use `wiki ingest --auto` only when you want unattended model-powered extraction.
 
 ### Query Pipeline
 
@@ -101,6 +103,14 @@ Sources → Ingest → Wiki Pages → Query → LLM Synthesis → Save Answer �
 
 ---
 
+## New Version: Agent-First by Default
+
+This version is intentionally **model-optional**.
+
+If you are already working inside Codex, Claude Code, Gemini CLI, or another strong AI CLI, do not make the wiki call a second model by default. Use the active agent to read and write; use the wiki for durable memory, validation, provenance, graph context, and quality checks.
+
+See `ABOUT.md` for the product philosophy and public-repo policy.
+
 ## Setup
 
 ```bash
@@ -111,9 +121,9 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-### LLM Configuration
+### Optional LLM Configuration
 
-The system works with any provider that speaks OpenAI-compatible API or Anthropic. Pick one:
+Provider credentials are not required for the agent-first workflow (`agent-ingest`, `pack`, `triage`, `scaffold`, `validate`, `rebuild`, `quality`, `coverage`). Configure a model only for unattended commands such as `wiki ingest --auto` or `wiki query` without `--context-only`.
 
 #### Ollama (local, recommended for privacy)
 
@@ -128,7 +138,7 @@ export OLLAMA_MODEL=qwen3.5:agentic
 #### Anthropic Claude (cloud)
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=<your-anthropic-api-key>
 ```
 
 #### OpenAI-compatible (Groq, LM Studio, Perplexity, etc.)
@@ -136,7 +146,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ```bash
 export OLLAMA_BASE_URL=https://api.groq.com/openai/v1
 export OLLAMA_MODEL=llama-3.1-70b-versatile
-export OLLAMA_API_KEY=gsk_...
+export OLLAMA_API_KEY=<your-openai-compatible-api-key>
 ```
 
 > [!note]
@@ -147,14 +157,16 @@ export OLLAMA_API_KEY=gsk_...
 ## Quick Start
 
 ```bash
-# 1. Ingest a source (fast mode — recommended)
-wiki ingest sources/my-paper.pdf --auto --no-retry
+# 1. Create a model-free ingestion plan for the active CLI agent
+wiki agent-ingest sources/articles/my-source.md --type article
 
-# 2. Ask a question — LLM synthesizes a cited answer
-wiki query "What does the wiki know about retrieval-augmented generation?"
+# 2. The active agent writes atomic pages into wiki/drafts/
+#    Then validate and promote clean drafts
+wiki validate
+wiki rebuild
 
-# 3. Save the synthesized answer as a new concept page
-wiki save-answer "RAG at Scale" --type concept
+# 3. Ask for model-free context any future agent can use
+wiki pack "What does the wiki know about retrieval-augmented generation?" --json
 
 # 4. Inspect the graph
 wiki state        # page inventory, contradictions, thin pages
@@ -165,13 +177,18 @@ wiki health      # lint errors and warnings
 
 | Command | Description |
 |---------|-------------|
-| `wiki ingest <source> --auto --no-retry` | Fast extraction (recommended) |
-| `wiki ingest <source> --auto` | Extraction with retry correction |
+| `wiki agent-ingest <source>` | Model-free ingestion plan for the active CLI agent |
+| `wiki ingest <source> --auto --no-retry` | Optional unattended model extraction |
+| `wiki ingest <source> --auto` | Optional extraction with retry correction |
 | `wiki ingest <source> --auto --mode gap` | Gap-driven extraction (2 LLM calls) |
 | `wiki query "question" --depth 2` | Graph-traversed query with LLM synthesis |
 | `wiki query "question" --depth 2 --no-expand` | Skip expansion (keyword-only) |
 | `wiki query "question" --expand-only` | Show expanded queries (debug) |
 | `wiki query "question" --context-only` | Raw context output (no LLM call) |
+| `wiki pack "task or question" --json` | Agent-ready context pack with pages, claims, health, warnings, and next actions |
+| `wiki triage --json` | Prioritized maintenance queue for stale pages, missing pages, contradictions, and errors |
+| `wiki scaffold "Missing Page"` | Create a schema-valid draft stub for a missing page |
+| `wiki draft case-study --topic "Topic"` | Assemble a cited draft artifact from existing wiki context |
 | `wiki save-answer "Title" --type concept` | Persist last query as draft |
 | `wiki validate` | Promote zero-error drafts |
 | `wiki link` | Build typed relationship graph |
@@ -208,7 +225,7 @@ The type determines traversal weight. A `cites` edge (weight 4) contributes more
   "content_hash": "e6f4cba0f587fe02",
   "sources": [
     {
-      "file": "ai-product-strategy-research-plan-google-2026-04-20T03-58-24.md",
+      "file": "example-research-report.md",
       "content_hash": "abc123",
       "sections_used": ["The Paradigm Shift to Agentic Autonomy"]
     }
@@ -218,7 +235,7 @@ The type determines traversal weight. A `cites` edge (weight 4) contributes more
       "id": "claim-1",
       "text": "Agentic AI executes multi-step workflows without continuous human input",
       "type": "fact",
-      "sources": ["ai-product-strategy-research-plan-google-2026-04-20T03-58-24.md"],
+      "sources": ["example-research-report.md"],
       "corroborated": true,
       "last_verified": "2026-04-20"
     }
@@ -246,7 +263,7 @@ wikis/
 │   ├── sources/        # Domain-specific raw sources
 │   └── wiki/           # Domain-specific extracted knowledge
 │
-├── mission400/         # Example: project-specific wiki
+├── example-project/    # Example: project-specific wiki
 ├── research/           # Example: academic research wiki
 └── notes/              # Example: personal notes wiki
 ```
@@ -389,9 +406,24 @@ wiki query "What is agentic AI?" --expand-only
 # Raw context only (for agents that synthesize themselves)
 wiki query "What is agentic AI?" --depth 2 --context-only
 
+# Agent-ready context pack (model-free JSON)
+wiki pack "What is agentic AI?" --depth 2 --json
+
+# Agent-first source processing plan (model-free)
+wiki agent-ingest ./sources/articles/source.md --json
+
+# Prioritized maintenance queue
+wiki triage --json
+
+# Create schema-valid drafts from graph gaps or existing context
+wiki scaffold "Product Strategy" --type concept
+wiki draft brief --topic "Agentic UX Strategy" --json
+
 # Persist a synthesized answer as a new wiki page
 wiki save-answer "Agentic AI Product Strategy — 2026 Synthesis" --type concept
 ```
+
+For agents and CLIs that already have their own model, prefer `wiki agent-ingest` for new sources and `wiki pack --json` for existing knowledge. These commands return source metadata, merge candidates, relevant pages, citation-backed claims, graph relationships, health status, stale pages, missing pages, contradictions, and suggested next actions without requiring any provider credentials.
 
 The `wiki query` command:
 1. Scores all pages by keyword overlap with the query

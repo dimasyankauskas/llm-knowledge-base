@@ -10,17 +10,17 @@ Add documents to a knowledge wiki, query the knowledge graph, and build structur
 
 ## What This Skill Does
 
-1. **Ingest**: drop a source (PDF, article, transcript) and get structured wiki pages
+1. **Plan ingestion**: profile a source and get a concrete extraction plan for the active CLI agent
 2. **Query**: ask a question and get a synthesized, cited answer from the knowledge graph
 3. **Link**: pages become typed graph nodes with relationship edges
 
 ## For Humans (Plain Language)
 
 ```bash
-# Ingest a document (fast mode — recommended)
-wiki ingest --auto --no-retry /path/to/source.pdf --type concept
+# Plan document ingestion for the active CLI agent
+wiki agent-ingest /path/to/source.pdf --type article
 
-# Ingest with automatic retry (slower but self-corrects)
+# Optional: run unattended model extraction
 wiki ingest --auto /path/to/source.pdf --type concept
 
 # Gap-driven ingestion (analyzes what's missing first)
@@ -40,7 +40,8 @@ wiki save-answer "RAG at Scale" --type concept
 
 ### LLM Setup
 
-The wiki works with Ollama (local) or Anthropic Claude (cloud):
+The wiki works without provider credentials when an AI CLI agent performs extraction.
+Configure Ollama or Anthropic only for unattended `wiki ingest --auto` or synthesized `wiki query`.
 
 ```bash
 # Ollama — local, private, fast
@@ -48,17 +49,17 @@ export OLLAMA_BASE_URL=http://localhost:11434
 export OLLAMA_MODEL=qwen3.5:agentic
 
 # Anthropic Claude — cloud
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=<your-anthropic-api-key>
 ```
 
 ### Ingestion Pipeline
 
 ```bash
-# Step 1: Ingest (recommended: --no-retry for trust-first extraction)
-wiki ingest --auto --no-retry /path/to/source.pdf --type concept
+# Step 1: Build an agent-first extraction plan
+wiki agent-ingest /path/to/source.pdf --type article
 
 # The pipeline:
-# Source → LLM Extract → Parse → Validate → Promote → Link → Lint
+# Source → Agent Plan → Agent Drafts → Validate → Promote → Link → Lint
 
 # Forward wikilinks are warnings not errors — they're graph edges
 # content_hash is auto-populated if missing

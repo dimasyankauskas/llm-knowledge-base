@@ -1,4 +1,5 @@
 {
   "version": "1.0",
+  "description": "Registry of ingested sources",
   "sources": []
 }

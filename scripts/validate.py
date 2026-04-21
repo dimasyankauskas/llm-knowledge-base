@@ -37,9 +37,13 @@ from utils import (
     ENTITIES_DIR,
     WIKI_DIR,
     extract_wikilinks,
+    hash_content,
     read_page,
     read_provenance,
+    write_page,
+    write_provenance,
 )
+from provenance import merge_provenance, refresh_page_claims
 
 
 # ── Data Classes ───────────────────────────────────────────────────────────────
@@ -516,14 +520,39 @@ def promote_draft(
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest_path = dest_dir / draft_path.name
 
-    # Move the draft file
-    draft_path.rename(dest_path)
-
-    # Also move the provenance sidecar if it exists
     prov_src = draft_path.with_suffix(draft_path.suffix + ".provenance.json")
-    if prov_src.exists():
-        prov_dest = dest_path.with_suffix(dest_path.suffix + ".provenance.json")
-        prov_src.rename(prov_dest)
+    prov_dest = dest_path.with_suffix(dest_path.suffix + ".provenance.json")
+
+    if dest_path.exists():
+        existing_post = read_page(dest_path)
+        existing_sources = list(existing_post.metadata.get("source_refs", []) or [])
+        incoming_sources = list(post.metadata.get("source_refs", []) or [])
+        merged_sources = list(dict.fromkeys(existing_sources + incoming_sources))
+        post.metadata["source_refs"] = merged_sources
+        post.metadata["content_hash"] = hash_content(post.content)
+        write_page(dest_path, post.metadata, post.content)
+        draft_path.unlink()
+
+        existing_prov = read_provenance(dest_path)
+        incoming_prov = read_provenance(draft_path)
+        merged_prov = merge_provenance(
+            existing_prov,
+            incoming_prov,
+            page=dest_path.stem,
+            content_hash=post.metadata["content_hash"],
+        )
+        write_provenance(dest_path, merged_prov)
+        if prov_src.exists():
+            prov_src.unlink()
+    else:
+        # Move the draft file
+        draft_path.rename(dest_path)
+
+        # Also move the provenance sidecar if it exists
+        if prov_src.exists():
+            prov_src.rename(prov_dest)
+
+    refresh_page_claims(dest_path)
 
     print(f"  Promoted {draft_path.name} -> {dest_path}")
     return dest_path

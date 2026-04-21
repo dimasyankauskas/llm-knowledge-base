@@ -297,13 +297,14 @@ class TestExpandQueryMocked:
             assert len(result) <= 5
 
     def test_expand_query_fallback_on_exception(self):
-        """expand_query should return [original] when LLM raises an exception."""
+        """expand_query should return deterministic expansions when LLM raises."""
         from scripts.query import expand_query
 
         with patch("llm_client.completion_with_retry", side_effect=RuntimeError("LLM unavailable")):
             result = expand_query("what is RAG")
 
-            assert result == ["what is RAG"]
+            assert result[0] == "what is RAG"
+            assert len(result) >= 2
 
     def test_expand_query_empty_string(self):
         """expand_query should handle empty string input."""
