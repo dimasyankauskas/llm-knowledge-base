@@ -1,18 +1,29 @@
 ---
 name: llm-wiki
-description: Use when you need to add sources to a knowledge wiki, query what the wiki knows, or build a knowledge graph from documents. Works with any AI agent that reads SKILL.md files.
+description: Use when you need to turn source documents into durable project memory, query what the wiki knows, or hand off grounded context between CLI agents. Works with any AI agent that reads SKILL.md files.
 user-invocable: true
 ---
 
 # LLM Wiki Skill
 
-Add documents to a knowledge wiki, query the knowledge graph, and build structured interlinked concept pages. Works with plain language or automated pipelines.
+Turn source documents into durable project memory: schema-checked Markdown pages, typed links, provenance, health checks, and agent-ready context packs.
+
+This skill is **agent-first** and **model-free**. The active CLI agent should do the reading, reasoning, and writing. The wiki provides the memory layer, validation rails, and graph context.
+
+## When to Use This Skill
+
+- You want to convert PDFs, docs, transcripts, or notes into a reusable knowledge base.
+- You want a later CLI agent to inherit grounded context without rebuilding it from scratch.
+- You want citations, provenance, and graph relationships instead of free-form notes.
+- You want a public-friendly, git-versioned wiki rather than a hosted notebook surface.
 
 ## What This Skill Does
 
-1. **Plan ingestion**: profile a source and get a concrete extraction plan for the active CLI agent
-2. **Query**: ask a question and get graph-traversed context excerpts (for the active agent to synthesize)
-3. **Link**: pages become typed graph nodes with relationship edges
+1. **Plan ingestion**: profile a source and give the active CLI agent a concrete extraction plan
+2. **Query**: gather graph-traversed context excerpts for the active agent to synthesize
+3. **Link**: turn pages into typed graph nodes with semantic edges
+4. **Validate**: enforce schema, sections, citations, and connectivity
+5. **Maintain**: surface stale pages, contradictions, thin pages, and missing links
 
 ## For Humans (Plain Language)
 
@@ -29,6 +40,12 @@ wiki save-answer "RAG at Scale" --type concept
 
 ## For AI Agents (Automated)
 
+### Core Operating Rule
+
+- Use the active CLI agent for reasoning and writing.
+- Use `wiki` for durable memory, validation, provenance, graph traversal, and health checks.
+- Do not treat this wiki as a second chatbot.
+
 ### Ingestion Pipeline
 
 ```bash
@@ -41,6 +58,15 @@ wiki agent-ingest /path/to/source.pdf --type article
 # Forward wikilinks are warnings not errors — they're graph edges
 # content_hash is auto-populated if missing
 ```
+
+Recommended workflow:
+
+1. Register and profile the source with `wiki agent-ingest`
+2. Read the source and write atomic drafts into `wiki/drafts/`
+3. Run `wiki validate`
+4. Run `wiki link`
+5. Run `wiki lint`
+6. Promote only clean content
 
 ### Query Pipeline
 
@@ -63,6 +89,8 @@ wiki query "What is agentic UX?" --depth 2 --context-only
 
 The query pipeline: seed pages → BFS traversal → context assembly → print context.
 
+Use `wiki pack --json` when you need compact, agent-readable context without depending on provider credentials.
+
 ### Validation
 
 ```bash
@@ -76,6 +104,13 @@ wiki health
 # LOW_CONNECTIVITY     : fewer than 2 connections (WARNING)
 # STALE_PAGE           : source changed since last hash (WARNING)
 ```
+
+### NotebookLM vs This Wiki
+
+- NotebookLM is a managed notebook for reading, asking questions, and summarizing inside the product.
+- This wiki is for durable project memory that lives in files, git, and CLI workflows.
+- If an agent can already talk to NotebookLM through MCP, that is fine for research.
+- Use this wiki when you want the output to remain in your repo, stay inspectable, and be reusable by future agents.
 
 ## Repository Structure
 

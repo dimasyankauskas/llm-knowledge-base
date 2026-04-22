@@ -2,6 +2,8 @@
 
 This folder contains the portable skill file (`SKILL.md`) for operating the LLM Wiki knowledge base from any AI agent.
 
+The goal is simple: help agents use the system correctly on the first try.
+
 ## Quick Start for Any AI Agent
 
 1. **Read `SKILL.md`** — contains the full operating instructions
@@ -25,6 +27,21 @@ wiki query "What does the wiki know about X?" --depth 2
 # Save last query context as a draft page
 wiki save-answer "Title" --type concept
 ```
+
+## What Agents Should Remember
+
+- The wiki is the memory layer, not the main reasoning engine.
+- The active CLI agent should read sources, write drafts, and verify results.
+- Use `wiki pack --json` for compact context handoff.
+- Use `wiki query` when you want the graph-traversed context assembled for you.
+- Use `wiki agent-ingest` when you want an extraction plan before writing.
+- This repo intentionally does not rely on external model calls.
+
+## NotebookLM Contrast
+
+- NotebookLM is good for hosted research notebooks and guided summaries.
+- This wiki is good when the output should live in your repo, be versioned in git, and remain editable by future CLI agents.
+- If an agent already uses NotebookLM MCP, that can help with research, but it does not replace this repo’s durable file-based workflow.
 
 ## Agent Instruction Files
 
