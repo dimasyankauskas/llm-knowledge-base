@@ -213,14 +213,14 @@ def generate_claude_md(
     lines.append("wiki health                             # Health summary")
     lines.append("")
     lines.append("# Maintenance & Prompts")
-    lines.append("wiki extract-prompt <source>            # Gen LLM prompt from SCHEMA")
+    lines.append("wiki extract-prompt <source>            # Generate an extraction prompt from SCHEMA")
     lines.append("wiki register <source> --type <type>    # Register only")
     lines.append("wiki check <source>                     # Dedup check")
     lines.append("wiki rebuild                            # Regenerate all")
     lines.append("wiki generate-instructions              # Regenerate this file")
     lines.append("```")
     lines.append("")
-    lines.append("Default workflow for new sources: run `wiki agent-ingest <source>`, read the source yourself, write atomic drafts in `wiki/drafts/`, then run `wiki validate`, `wiki rebuild`, `wiki quality --json`, and `wiki coverage <source> --json`. Use `wiki ingest --auto` only for unattended model-powered extraction.")
+    lines.append("Default workflow for new sources: run `wiki agent-ingest <source>`, read the source yourself, write atomic drafts in `wiki/drafts/`, then run `wiki validate`, `wiki rebuild`, `wiki quality --json`, and `wiki coverage <source> --json`.")
     lines.append("")
 
     # ── Key Conventions ──

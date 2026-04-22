@@ -5,7 +5,7 @@ This folder contains the portable skill file (`SKILL.md`) for operating the LLM 
 ## Quick Start for Any AI Agent
 
 1. **Read `SKILL.md`** — contains the full operating instructions
-2. **Read `CLAUDE.md`** — contains detailed system architecture
+2. **Read `AGENTS.md`** — contains detailed system architecture and rules
 3. **Read `SCHEMA.yaml`** — contains the page constitution
 
 ## How to Use
@@ -19,10 +19,10 @@ wiki agent-ingest /path/to/source.md --type article
 # Retrieve agent-ready context without calling another model
 wiki pack "What does the wiki know about X?" --json
 
-# Optional: query with synthesis if an LLM provider is configured
+# Query assembles graph-traversed context (no model calls)
 wiki query "What does the wiki know about X?" --depth 2
 
-# Save useful synthesis
+# Save last query context as a draft page
 wiki save-answer "Title" --type concept
 ```
 
@@ -30,8 +30,6 @@ wiki save-answer "Title" --type concept
 
 | File | Agent |
 |------|-------|
-| `CLAUDE.md` | Claude Code |
-| `GEMINI.md` | Gemini CLI |
 | `AGENTS.md` | Codex, Copilot, others |
 | `skill/SKILL.md` | Any agent (portable) |
 
@@ -40,16 +38,9 @@ wiki save-answer "Title" --type concept
 In Claude Code: `/llm-wiki`
 In other agents: Read `skill/SKILL.md` directly.
 
-## LLM Setup
+## Model Calls
 
-LLM credentials are optional. The default agent-first workflow uses the current CLI agent plus model-free wiki commands such as `agent-ingest`, `pack`, `triage`, `validate`, `rebuild`, `quality`, and `coverage`.
-
-Configure a provider only for unattended `wiki ingest --auto` or `wiki query` synthesis.
-
-```bash
-export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=qwen3.5:agentic
-```
+This repository intentionally performs **no external model calls**. Use your active CLI agent for reasoning/writing; use the wiki for memory, validation, provenance, and retrieval context.
 
 ## Repository
 

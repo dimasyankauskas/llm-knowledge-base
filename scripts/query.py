@@ -15,16 +15,20 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils import (
+    SOURCES_DIR,
     WIKI_DIR,
     GRAPH_PATH,
     list_wiki_pages,
     read_page,
     extract_wikilinks,
 )
+
+from extract import read_source
 
 # Edge weights from schema relation types
 EDGE_WEIGHTS = {
@@ -40,68 +44,14 @@ EDGE_WEIGHTS = {
 
 
 def expand_query(question: str, model: str | None = None) -> list[str]:
-    """Expand a question into multiple search queries using LLM.
+    """Deterministically expand a question into a few search variants.
 
-    Returns a list of query strings including the original question.
-    Falls back to [question] if LLM is unavailable or returns invalid output.
+    This project intentionally performs **no external model calls**. Expansion is
+    a lightweight heuristic to improve keyword recall.
     """
     if not question.strip():
         return [question]
-
-    system_prompt = (
-        "Output exactly 3-4 short search queries for a knowledge base, one per line. "
-        "No thinking, no explanation, no numbering. Each query: 2-6 words using synonyms "
-        "and related terms for the given question."
-    )
-    prompt = f"Question: {question}\n\nQueries:"
-
-    try:
-        from llm_client import completion_with_retry
-        response = completion_with_retry(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            model=model,
-            temperature=0.7,
-            max_tokens=256,
-            timeout=30,
-            max_retries=1,
-        )
-        # Strip thinking/reasoning blocks from models that emit them
-        # Models like qwen output "Thinking Process:\n..." before the actual answer
-        clean = response.strip()
-        if "Thinking Process:" in clean:
-            # Take everything after the last "Thinking Process:" block
-            parts = clean.split("\n\n")
-            clean_parts = []
-            in_thinking = False
-            for part in parts:
-                if part.strip().startswith("Thinking Process:"):
-                    in_thinking = True
-                    continue
-                if in_thinking and part.strip().startswith(("*", "1.", "2.", "3.", "4.")):
-                    continue
-                in_thinking = False
-                clean_parts.append(part)
-            clean = "\n\n".join(clean_parts)
-
-        lines = [line.strip() for line in clean.splitlines() if line.strip()]
-        # Filter out common non-query patterns
-        lines = [l for l in lines if len(l.split()) <= 8 and not l.startswith(("#", "*", "-"))]
-        if not lines:
-            return [question]
-        # Always include the original question
-        queries = [question] + lines
-        # Deduplicate while preserving order
-        seen = set()
-        unique = []
-        for q in queries:
-            q_lower = q.lower()
-            if q_lower not in seen:
-                seen.add(q_lower)
-                unique.append(q)
-        return unique[:5]  # Cap at 5 queries total
-    except Exception:
-        return _fallback_expansions(question)
+    return _fallback_expansions(question)
 
 
 def _fallback_expansions(question: str) -> list[str]:
@@ -127,6 +77,90 @@ def _fallback_expansions(question: str) -> list[str]:
             seen.add(key)
             unique.append(expansion)
     return unique
+
+
+def _query_tokens(question: str) -> list[str]:
+    return [t for t in re.findall(r"[a-z0-9]+", question.lower()) if len(t) > 2]
+
+
+def _snippet_lines(text: str, tokens: list[str], max_snippets: int = 6) -> list[str]:
+    if not tokens:
+        return []
+    snippets: list[str] = []
+    for i, line in enumerate(text.splitlines(), start=1):
+        low = line.lower()
+        if any(t in low for t in tokens):
+            snippets.append(f"L{i}: {line}")
+            if len(snippets) >= max_snippets:
+                break
+    return snippets
+
+
+def search_sources(
+    question: str,
+    manifest: dict[str, Any] | None = None,
+    sources_dir: Path | None = None,
+    top_k: int = 5,
+) -> list[dict[str, Any]]:
+    """Search registered raw sources for matching lines/snippets (no model calls)."""
+    sources_dir = sources_dir or SOURCES_DIR
+    tokens = _query_tokens(question)
+    if not tokens:
+        return []
+
+    # Gather candidate files:
+    candidates: list[dict[str, Any]] = []
+
+    type_dir_map = {
+        "article": "articles",
+        "paper": "papers",
+        "transcript": "transcripts",
+        "code-doc": "code-docs",
+    }
+
+    if isinstance(manifest, dict) and manifest.get("sources"):
+        for entry in manifest.get("sources", []):
+            filename = entry.get("filename")
+            source_type = entry.get("source_type") or "article"
+            if not filename:
+                continue
+            folder = type_dir_map.get(source_type, str(source_type))
+            path = sources_dir / folder / filename
+            candidates.append({"path": path, "filename": filename, "source_type": source_type})
+    else:
+        for path in sorted(sources_dir.rglob("*")):
+            if not path.is_file():
+                continue
+            if path.name in {"manifest.json", "manifest.example.json", "README.md", ".gitkeep"}:
+                continue
+            if path.suffix.lower() not in {".md", ".txt", ".pdf", ".json", ".yaml", ".yml"}:
+                continue
+            candidates.append({"path": path, "filename": path.name, "source_type": path.parent.name})
+
+    results: list[dict[str, Any]] = []
+    for item in candidates:
+        path: Path = item["path"]
+        if not path.exists():
+            continue
+        try:
+            text = read_source(path)
+        except Exception:
+            continue
+        low = text.lower()
+        score = sum(min(low.count(t), 25) for t in tokens)
+        if score <= 0:
+            continue
+        snippets = _snippet_lines(text, tokens=tokens, max_snippets=8)
+        results.append({
+            "filename": item["filename"],
+            "source_type": item.get("source_type"),
+            "path": str(path),
+            "score": score,
+            "snippets": snippets,
+        })
+
+    results.sort(key=lambda r: r.get("score", 0), reverse=True)
+    return results[:top_k]
 
 
 def index_boost(question: str, wiki_dir: Path | None = None) -> dict[str, float]:
@@ -385,28 +419,6 @@ def build_context(pages: list[dict], max_chars: int = 50_000) -> str:
     return "\n".join(context_parts)
 
 
-def synthesize_answer(question: str, context: str, model: str | None = None) -> str:
-    """Call LLM to synthesize an answer from wiki context."""
-    from llm_client import completion_with_retry
-
-    system_prompt = (
-        "You are a knowledge base query engine. Answer the user's question using ONLY "
-        "the provided wiki context. Cite sources using [source: filename, §section] format. "
-        "If the context doesn't contain enough information, say so explicitly. "
-        "Be concise, factual, and structured. Use markdown headers and bullet points."
-    )
-    prompt = f"## Question\n{question}\n\n## Wiki Context\n{context}\n\n## Answer\n"
-
-    return completion_with_retry(
-        prompt=prompt,
-        system_prompt=system_prompt,
-        model=model,
-        temperature=0.3,
-        max_tokens=4096,
-        timeout=180,
-    )
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="LLM Knowledge Base v2 — Graph-Traversal Query Engine",
@@ -415,7 +427,7 @@ def main():
     parser.add_argument("--depth", type=int, default=2, help="Link traversal depth (default: 2)")
     parser.add_argument("--top-k", type=int, default=5, help="Number of seed pages (default: 5)")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
-    parser.add_argument("--context-only", action="store_true", help="Output raw context without LLM synthesis")
+    parser.add_argument("--context-only", action="store_true", help="Output raw context only")
     parser.add_argument("--no-expand", action="store_true", help="Skip query expansion (keyword-only)")
     parser.add_argument("--expand-only", action="store_true", help="Show expanded queries without running pipeline")
 
@@ -464,27 +476,6 @@ def main():
 
     traversed = traverse_typed_graph(seed_pages, graph, args.depth)
     context = build_context(traversed)
-
-    if args.context_only:
-        print(context)
-        sys.exit(0)
-
-    print(f"\n🔍 Question: {args.question}")
-    if len(queries) > 1:
-        print(f"📝 Expanded: {', '.join(queries[1:])}")
-    print(f"📄 Seed pages: {', '.join(p.stem for p in seed_pages)}")
-    print(f"🔗 Traversed: {len(traversed)} pages (depth={args.depth})")
-    print(f"📝 Context: {len(context):,} chars")
-    print(f"🧠 Synthesizing answer...\n")
-
-    try:
-        answer = synthesize_answer(args.question, context)
-        print(answer)
-    except Exception as e:
-        print(f"⚠️  LLM synthesis failed: {e}")
-        print("Falling back to raw context:\n")
-        print(context)
-
     if args.json:
         output = {
             "question": args.question,
@@ -493,9 +484,18 @@ def main():
             "traversed_pages": [{"page": r["page"].stem, "score": r["score"], "path": r["path"]} for r in traversed],
             "context_chars": len(context),
             "context": context,
-            "answer": answer,
+            "answer": None,
         }
         print(json.dumps(output, indent=2, ensure_ascii=False))
+        return
+
+    print(f"\n🔍 Question: {args.question}")
+    if len(queries) > 1:
+        print(f"📝 Expanded: {', '.join(queries[1:])}")
+    print(f"📄 Seed pages: {', '.join(p.stem for p in seed_pages)}")
+    print(f"🔗 Traversed: {len(traversed)} pages (depth={args.depth})")
+    print(f"📝 Context: {len(context):,} chars\n")
+    print(context)
 
 
 if __name__ == "__main__":

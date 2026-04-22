@@ -78,13 +78,6 @@ The repository is published as a clean template:
 
 Users bring their own sources locally. Commit source files and generated wiki pages only when those documents are intentionally public.
 
-## Optional Model Automation
+## Model Calls
 
-External or local models are still supported:
-
-```bash
-wiki ingest ./path/to/source.md --auto
-wiki query "What does the wiki know about this?" --depth 2
-```
-
-Use these when no active agent is supervising, or when you want the wiki to synthesize an answer directly. For normal AI CLI work, prefer `wiki agent-ingest` and `wiki pack --json`.
+This repository intentionally performs **no external model calls**. The active CLI agent is the extraction/synthesis engine; the wiki is the memory + validation substrate.

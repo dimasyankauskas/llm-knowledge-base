@@ -26,6 +26,7 @@ ENTITIES_DIR = WIKI_DIR / "entities"
 INDEXES_DIR = WIKI_DIR / "indexes"
 TIMELINES_DIR = WIKI_DIR / "timelines"
 MANIFEST_PATH = SOURCES_DIR / "manifest.json"
+MANIFEST_EXAMPLE_PATH = SOURCES_DIR / "manifest.example.json"
 GRAPH_PATH = WIKI_DIR / "_graph.json"
 SCHEMA_PATH = WIKI_ROOT / "SCHEMA.yaml"
 
@@ -70,6 +71,8 @@ def load_manifest() -> dict:
     """Load the source manifest."""
     if MANIFEST_PATH.exists():
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    if MANIFEST_EXAMPLE_PATH.exists():
+        return json.loads(MANIFEST_EXAMPLE_PATH.read_text(encoding="utf-8"))
     return {"version": "1.0", "description": "Registry of ingested sources", "sources": []}
 
 

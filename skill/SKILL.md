@@ -11,7 +11,7 @@ Add documents to a knowledge wiki, query the knowledge graph, and build structur
 ## What This Skill Does
 
 1. **Plan ingestion**: profile a source and get a concrete extraction plan for the active CLI agent
-2. **Query**: ask a question and get a synthesized, cited answer from the knowledge graph
+2. **Query**: ask a question and get graph-traversed context excerpts (for the active agent to synthesize)
 3. **Link**: pages become typed graph nodes with relationship edges
 
 ## For Humans (Plain Language)
@@ -20,37 +20,14 @@ Add documents to a knowledge wiki, query the knowledge graph, and build structur
 # Plan document ingestion for the active CLI agent
 wiki agent-ingest /path/to/source.pdf --type article
 
-# Optional: run unattended model extraction
-wiki ingest --auto /path/to/source.pdf --type concept
-
-# Gap-driven ingestion (analyzes what's missing first)
-wiki ingest --auto --mode gap /path/to/source.pdf --type concept
-
-# Ask the wiki a question — LLM synthesizes a cited answer
-wiki query "What does the wiki know about retrieval-augmented generation?"
-
-# Raw context only (no LLM call)
+# Ask the wiki a question — returns context only
 wiki query "What does the wiki know about RAG?" --context-only
 
-# Save a useful synthesized answer as a concept page
+# Save the last query context as a concept draft page
 wiki save-answer "RAG at Scale" --type concept
 ```
 
 ## For AI Agents (Automated)
-
-### LLM Setup
-
-The wiki works without provider credentials when an AI CLI agent performs extraction.
-Configure Ollama or Anthropic only for unattended `wiki ingest --auto` or synthesized `wiki query`.
-
-```bash
-# Ollama — local, private, fast
-export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=qwen3.5:agentic
-
-# Anthropic Claude — cloud
-export ANTHROPIC_API_KEY=<your-anthropic-api-key>
-```
 
 ### Ingestion Pipeline
 
@@ -68,26 +45,23 @@ wiki agent-ingest /path/to/source.pdf --type article
 ### Query Pipeline
 
 ```bash
-# Query with LLM synthesis (BFS through typed edges, then LLM produces answer)
-wiki query "What is agentic UX?" --depth 2
-
 # Skip expansion (keyword-only, fast)
 wiki query "What is agentic UX?" --depth 2 --no-expand
 
 # Show expanded queries (debug)
 wiki query "What is agentic UX?" --expand-only
 
-# Raw context only (no LLM call — for agents that synthesize themselves)
+# Raw context only
 wiki query "What is agentic UX?" --depth 2 --context-only
 
 # Options:
 # --depth N       : how many hops from seed pages (default: 2)
 # --top-k N      : number of seed pages (default: 5)
-# --json         : structured JSON output (includes synthesized answer)
-# --context-only  : raw context output, skip LLM synthesis
+# --json         : structured JSON output (context + traversal metadata)
+# --context-only  : raw context output (same as default output)
 ```
 
-The query pipeline: seed pages → BFS traversal → context assembly → LLM synthesis → cited answer.
+The query pipeline: seed pages → BFS traversal → context assembly → print context.
 
 ### Validation
 
@@ -108,17 +82,16 @@ wiki health
 ```
 llm-wiki/
 ├── SCHEMA.yaml           # Page constitution
-├── CLAUDE.md             # Full agent instructions
+├── AGENTS.md             # Full agent instructions
 ├── skill/
 │   └── SKILL.md         # This file — portable skill for any AI agent
 ├── scripts/
 │   ├── cli.py           # wiki CLI entry point
-│   ├── auto_ingest.py   # Full ingestion pipeline
-│   ├── llm_client.py    # Anthropic + Ollama abstraction
 │   ├── validate.py       # Draft validation
 │   ├── lint.py          # Structural checks
 │   ├── link.py          # Graph builder
-│   └── query.py         # Graph-traversal query + LLM synthesis
+│   ├── query.py         # Graph-traversal query (context-first)
+│   └── ingest_folder.sh # Example: batch register a folder of sources
 ├── sources/              # Read-only source documents
 └── wiki/                # Extracted knowledge base
     ├── concepts/        # Concept pages
@@ -154,18 +127,6 @@ HIGH   : Multiple independent sources agree (green)
 MEDIUM : Single source, well-established (yellow)
 LOW    : Inference or contested (red)
 ```
-
-## Gap-Driven Extraction (InfraNodus Mode)
-
-```bash
-wiki ingest --auto --mode gap /path/to/source.pdf --type concept
-```
-
-Two-pass extraction:
-1. Analyze existing wiki for structural gaps
-2. Extract specifically to fill those gaps
-
-Requires 2 LLM calls. Slower but useful for systematic coverage.
 
 ## Schema
 

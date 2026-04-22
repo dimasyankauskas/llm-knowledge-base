@@ -16,11 +16,6 @@ dependencies = [
     "pymupdf>=1.25.0",
 ]
 
-[project.optional-dependencies]
-ollama = ["openai>=1.0"]
-anthropic = ["anthropic>=0.96"]
-all = ["openai>=1.0", "anthropic>=0.96"]
-
 [project.scripts]
 wiki = "scripts.cli:main"
 

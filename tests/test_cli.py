@@ -17,7 +17,7 @@ class TestCLIIngest:
              patch("scripts.cli.save_state") as mock_save_state, \
              patch("scripts.cli.generate_health") as mock_health, \
              patch("scripts.cli.save_health") as mock_save_health:
-            mock_reg.return_value = Path("/tmp/test.pdf")
+            mock_reg.return_value = {"filename": "test.pdf", "source_type": "paper", "content_hash": "deadbeef"}
             mock_graph.return_value = {"nodes": [], "edges": []}
             mock_lint.return_value = []
             mock_state.return_value = {"schema_version": "2.0", "pages": {}}
@@ -79,11 +79,13 @@ class TestCLIHealth:
 class TestCLIQuery:
     def test_query_returns_context(self, tmp_path, capsys):
         """Query subcommand should find seed pages and build context."""
-        with patch("scripts.cli.list_wiki_pages") as mock_list, \
+        with patch("scripts.cli.list_concept_pages") as mock_concepts, \
+             patch("scripts.cli.list_entity_pages") as mock_entities, \
              patch("scripts.cli.find_seed_pages") as mock_find, \
              patch("scripts.cli.traverse_typed_graph") as mock_traverse, \
              patch("scripts.cli.build_context") as mock_build:
-            mock_list.return_value = [Path("wiki/concepts/RAG.md")]
+            mock_concepts.return_value = [Path("wiki/concepts/RAG.md")]
+            mock_entities.return_value = []
             mock_find.return_value = [Path("wiki/concepts/RAG.md")]
             mock_traverse.return_value = [{"page": Path("wiki/concepts/RAG.md"), "score": 10.0, "path": ["RAG"]}]
             mock_build.return_value = "RAG context"
@@ -114,7 +116,7 @@ class TestCLISubstrate:
         """Agent-ingest should expose a model-free active-agent workflow."""
         with patch("scripts.cli.register_source") as mock_register, \
              patch("scripts.cli.build_agent_ingest_plan") as mock_plan:
-            mock_register.return_value = Path("/tmp/sources/articles/case.md")
+            mock_register.return_value = {"filename": "case.md", "source_type": "article", "content_hash": "deadbeef"}
             mock_plan.return_value = {
                 "schema_version": "1.0",
                 "mode": "agent-first",
@@ -253,7 +255,7 @@ class TestCLIRegister:
     def test_register_source(self, tmp_path, capsys):
         """Register subcommand should register a source."""
         with patch("scripts.cli.register_source") as mock_reg:
-            mock_reg.return_value = Path("/tmp/test.pdf")
+            mock_reg.return_value = {"filename": "test.pdf", "source_type": "paper", "content_hash": "deadbeef"}
             main(["register", "test.pdf", "--type", "paper"])
             mock_reg.assert_called_once()
             captured = capsys.readouterr()

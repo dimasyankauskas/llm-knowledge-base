@@ -12,29 +12,16 @@ that follow the schema rules below. You ARE the LLM extraction engine; scripts h
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && pip install -e .    # makes 'wiki' CLI available
+pip install -r requirements.txt -r requirements-dev.txt && pip install -e .    # makes 'wiki' CLI available
 pytest tests/ -v                                       # run test suite
 ```
 
 Requires Python 3.9+. The `wiki` command won't work without `pip install -e .`.
 
-### LLM Configuration
+### Model Calls
 
-Set one of these before using `wiki ingest` or `wiki query`:
-
-```bash
-# Ollama (local, recommended)
-export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=qwen3.5:agentic
-
-# Anthropic Claude (cloud)
-export ANTHROPIC_API_KEY=<your-anthropic-api-key>
-
-# OpenAI-compatible (Groq, LM Studio, etc.)
-export OLLAMA_BASE_URL=https://api.groq.com/openai/v1
-export OLLAMA_MODEL=llama-3.1-70b-versatile
-export OLLAMA_API_KEY=<your-openai-compatible-api-key>
-```
+This repository intentionally performs **no external model calls** (cloud or local daemon).
+Use the active CLI agent (Codex, Claude Code, Gemini CLI, etc.) as the reasoning/writing engine.
 
 ## Bootstrap
 
@@ -156,12 +143,6 @@ wiki agent-ingest <source> --type <type>
 # Register-only pipeline
 wiki ingest <source> --type <type>
 
-# Optional unattended extraction (calls configured external/local model)
-wiki ingest <source> --auto --no-retry
-
-# Gap-driven extraction (InfraNodus-style, 2 LLM calls, timeout risk)
-wiki ingest <source> --auto --mode gap
-
 # Individual stages
 wiki extract <source> --type <type>    # Register source
 wiki validate                           # Validate drafts
@@ -183,7 +164,7 @@ wiki state                              # State summary
 wiki health                            # Health summary
 
 # Maintenance & Prompts
-wiki extract-prompt <source>            # Gen LLM prompt from SCHEMA
+wiki extract-prompt <source>            # Generate an extraction prompt from SCHEMA
 wiki register <source> --type <type>    # Register only
 wiki check <source>                     # Dedup check
 wiki rebuild                            # Regenerate all
@@ -209,48 +190,28 @@ wiki agent-ingest <path> --type article
 # Gather context without calling another model
 wiki pack "question or task" --depth 2 --json
 
-# Ask the wiki a question: LLM synthesizes a cited answer from wiki pages
+# Ask the wiki a question: returns graph-traversed context for the active agent
 wiki query "question" --depth 2
 
-# Raw context only (no LLM call: for agents that synthesize themselves)
+# Raw context only
 wiki query "question" --depth 2 --context-only
 
-# Save the last query result (including LLM synthesis) as a wiki draft page
+# Save the last query context as a wiki draft page
 wiki save-answer "Title" --type concept
-
-# Optional unattended ingest (only when you want the wiki to call a configured model)
-wiki ingest <path> --auto --no-retry
-
-# Ingest with retry loop (slower but corrects frontmatter errors)
-wiki ingest <path> --auto
 ```
 
 **When to use each:**
 - `wiki agent-ingest`: default for new sources when the current CLI agent can read, reason, and write pages
 - `wiki pack --json`: default for retrieving existing wiki context without provider credentials
 - `wiki query`: when the user asks what the wiki knows about X, or to gather context before writing
-- `wiki save-answer`: after a `query` that produces useful synthesis, to persist it
-- `wiki ingest --auto --no-retry`: unattended model extraction when no active agent is supervising
-- `wiki ingest --auto`: unattended model extraction when you need the retry loop to correct frontmatter errors
+- `wiki save-answer`: after a `query` that produces useful context, to persist it
 
 **Agent-first behavior:**
 1. `wiki agent-ingest` registers/profiles a source, finds merge candidates, and prints schema/citation rules.
 2. The active CLI agent reads the source and writes atomic drafts into `wiki/drafts/`.
 3. `wiki validate` promotes zero-error drafts.
 4. `wiki rebuild`, `wiki quality --json`, and `wiki coverage <source> --json` verify the result.
-5. No external model is required unless the user explicitly wants unattended automation.
-
-**Pipeline behavior with --no-retry:**
-1. Read source -> LLM extraction -> parse -> promote (no retry)
-2. Wikilinks: WARNING not ERROR (forward references become graph edges)
-3. content_hash: auto-populated if missing
-4. Schema-compliant output guaranteed by model quality
-
-**Gap-driven mode (InfraNodus-style):**
-```bash
-wiki ingest <path> --auto --mode gap
-```
-Requires 2 LLM calls. May timeout on slow models. Use when gap analysis is prioritized.
+5. No external model is required (or supported) — use the active agent.
 
 ## Key Conventions
 
@@ -266,5 +227,4 @@ Requires 2 LLM calls. May timeout on slow models. Use when gap analysis is prior
 - **Don't run scripts directly**: `python scripts/cli.py` fails with `ModuleNotFoundError`. Use `wiki` CLI (after `pip install -e .`) or set `PYTHONPATH=.`
 - **`wiki` command not found**: You forgot `pip install -e .`; it registers the entry point
 - **Forward wikilinks aren't errors**: A `[[Page]]` link to a nonexistent page is a WARNING (graph edge), not an ERROR. Don't delete them.
-- **Gap mode can timeout**: `--mode gap` makes 2 LLM calls and may timeout on slow models. Use `--no-retry` for reliability.
 - **SCHEMA.yaml is the source of truth**: Page types, validation rules, and relation weights are defined there. This file summarizes them; if they conflict, trust the schema.

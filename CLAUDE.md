@@ -146,14 +146,14 @@ wiki state                              # State summary
 wiki health                             # Health summary
 
 # Maintenance & Prompts
-wiki extract-prompt <source>            # Gen LLM prompt from SCHEMA
+wiki extract-prompt <source>            # Generate an extraction prompt from SCHEMA
 wiki register <source> --type <type>    # Register only
 wiki check <source>                     # Dedup check
 wiki rebuild                            # Regenerate all
 wiki generate-instructions              # Regenerate this file
 ```
 
-Default workflow for new sources: run `wiki agent-ingest <source>`, read the source yourself, write atomic drafts in `wiki/drafts/`, then run `wiki validate`, `wiki rebuild`, `wiki quality --json`, and `wiki coverage <source> --json`. Use `wiki ingest --auto` only for unattended model-powered extraction.
+Default workflow for new sources: run `wiki agent-ingest <source>`, read the source yourself, write atomic drafts in `wiki/drafts/`, then run `wiki validate`, `wiki rebuild`, `wiki quality --json`, and `wiki coverage <source> --json`.
 
 ## Key Conventions
 

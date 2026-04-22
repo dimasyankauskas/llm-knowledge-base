@@ -36,10 +36,15 @@ sources/articles/
 sources/papers/
 sources/transcripts/
 sources/code-docs/
+sources/manifest.json
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Tooling / local metadata
+.claude/
+.remember/
 
 # Editor
 .vscode/

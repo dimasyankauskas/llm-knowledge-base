@@ -93,7 +93,7 @@ wiki agent-ingest <source>
                                                       └────────────┘
 ```
 
-`wiki agent-ingest` does not call another model. It gives the current CLI agent a source profile, merge candidates, schema contract, citation format, and exact validation commands. Use `wiki ingest --auto` only when you want unattended model-powered extraction.
+`wiki agent-ingest` gives the current CLI agent a source profile, merge candidates, schema contract, citation format, and exact validation commands.
 
 ### Query Pipeline
 
@@ -104,15 +104,13 @@ wiki query "What's the relationship between agentic AI and edge computing?" --de
 Two operations run in sequence:
 
 1. **Graph traversal** — BFS from seed pages through typed edges, assembling a sourced context block (up to 50K chars)
-2. **LLM synthesis** — the configured LLM produces a structured, cited answer using only wiki pages as source material
-
-Every claim in the synthesized answer traces back to an ingested document. No hallucination from training data.
+2. **Context output** — the wiki prints the assembled context (or returns it as JSON) for the active agent to use
 
 ```bash
-# Raw context only (skip LLM call, faster)
+# Raw context only
 wiki query "What is agentic AI?" --depth 2 --context-only
 
-# JSON output (includes synthesized answer)
+# JSON output (context + traversal metadata)
 wiki query "What is agentic AI?" --depth 2 --json
 ```
 
@@ -122,21 +120,15 @@ wiki query "What is agentic AI?" --depth 2 --json
 wiki save-answer "Agentic AI and Edge Computing" --type concept
 ```
 
-The synthesized answer persists as a schema-compliant draft page. This closes the loop — every query can produce new knowledge that becomes part of the graph.
-
-```
-Sources → Ingest → Wiki Pages → Query → LLM Synthesis → Save Answer → Wiki Pages
-                                    ↑                                              |
-                                    └──────────── The loop compounds ──────────────┘
-```
+The last query context persists as a schema-compliant draft page you can refine and promote. This closes the loop — useful work-products become durable wiki memory.
 
 ---
 
 ## New Version: Agent-First by Default
 
-This version is intentionally **model-optional**.
+This version is intentionally **model-free**.
 
-If you are already working inside Codex, Claude Code, Gemini CLI, or another strong AI CLI, do not make the wiki call a second model by default. Use the active agent to read and write. Use the wiki for durable memory, validation, provenance, graph context, and quality checks.
+If you are already working inside Codex, Claude Code, Gemini CLI, or another strong AI CLI, use the active agent to read and write. Use the wiki for durable memory, validation, provenance, graph context, and quality checks.
 
 See `ABOUT.md` for the product philosophy and public-repo policy.
 
@@ -150,33 +142,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-### Optional LLM Configuration
-
-Provider credentials are not required for the agent-first workflow (`agent-ingest`, `pack`, `triage`, `scaffold`, `validate`, `rebuild`, `quality`, `coverage`). Configure a model only for unattended commands such as `wiki ingest --auto` or `wiki query` without `--context-only`.
-
-#### Ollama (local, recommended for privacy)
-
-```bash
-# Install: https://ollama.com
-ollama pull qwen3.5:agentic
-
-export OLLAMA_BASE_URL=http://localhost:11434
-export OLLAMA_MODEL=qwen3.5:agentic
-```
-
-#### Anthropic Claude (cloud)
-
-```bash
-export ANTHROPIC_API_KEY=<your-anthropic-api-key>
-```
-
-#### OpenAI-compatible (Groq, LM Studio, Perplexity, etc.)
-
-```bash
-export OLLAMA_BASE_URL=https://api.groq.com/openai/v1
-export OLLAMA_MODEL=llama-3.1-70b-versatile
-export OLLAMA_API_KEY=<your-openai-compatible-api-key>
-```
+This repository intentionally performs **no external model calls**. Use your active CLI agent for reading, reasoning, and writing.
 
 > [!note]
 > The CLI entry point is `wiki`. After `pip install -e .`, run `wiki ingest`, `wiki query`, etc. directly.
@@ -207,13 +173,11 @@ wiki health      # lint errors and warnings
 | Command | Description |
 |---------|-------------|
 | `wiki agent-ingest <source>` | Model-free ingestion plan for the active CLI agent |
-| `wiki ingest <source> --auto --no-retry` | Optional unattended model extraction |
-| `wiki ingest <source> --auto` | Optional extraction with retry correction |
-| `wiki ingest <source> --auto --mode gap` | Gap-driven extraction (2 LLM calls) |
-| `wiki query "question" --depth 2` | Graph-traversed query with LLM synthesis |
+| `wiki ingest <source>` | Register source + rebuild graph + health |
+| `wiki query "question" --depth 2` | Graph-traversed query (context-first; no model calls) |
 | `wiki query "question" --depth 2 --no-expand` | Skip expansion (keyword-only) |
 | `wiki query "question" --expand-only` | Show expanded queries (debug) |
-| `wiki query "question" --context-only` | Raw context output (no LLM call) |
+| `wiki query "question" --context-only` | Raw context output (same as default output) |
 | `wiki pack "task or question" --json` | Agent-ready context pack with pages, claims, health, warnings, and next actions |
 | `wiki triage --json` | Prioritized maintenance queue for stale pages, missing pages, contradictions, and errors |
 | `wiki scaffold "Missing Page"` | Create a schema-valid draft stub for a missing page |
@@ -336,20 +300,18 @@ Each instance is independent: its own git history, its own sources, its own wiki
 ```
 llm-knowledge-base/
 ├── SCHEMA.yaml              # Page schema (constitution)
-├── CLAUDE.md                # AI agent instructions
 ├── requirements.txt
 ├── pyproject.toml
 │
 ├── scripts/
 │   ├── cli.py               # Unified CLI entry point (wiki command)
-│   ├── auto_ingest.py       # Full ingestion pipeline
-│   ├── llm_client.py        # LLM provider abstraction (Anthropic + Ollama)
 │   ├── extract.py           # Source registration + SHA-256 dedup
+│   ├── ingest_folder.sh     # Example: batch register a folder of sources
 │   ├── validate.py          # Draft validation + promotion
 │   ├── link.py              # Typed graph builder
 │   ├── lint.py              # 12 structural checks
 │   ├── consolidate.py       # Duplicate merge + index generation
-│   ├── query.py             # Graph traversal + LLM synthesis
+│   ├── query.py             # Graph traversal + source/page context assembly
 │   ├── refine.py            # Gap analysis + contradiction detection
 │   ├── provenance.py        # Sidecar CRUD + staleness detection
 │   ├── state.py             # _state.json generator
@@ -357,7 +319,7 @@ llm-knowledge-base/
 │   └── utils.py             # Paths, hashing, wikilink parsing
 │
 ├── sources/                  # Read-only source documents
-│   ├── manifest.json         # SHA-256 registry
+│   ├── manifest.json         # SHA-256 registry (generated locally; do not commit)
 │   ├── articles/
 │   ├── papers/
 │   ├── transcripts/
@@ -371,29 +333,6 @@ llm-knowledge-base/
 │
 └── tests/                   # 14 test modules, 200+ tests
 ```
-
----
-
-## LLM Provider Configuration
-
-```python
-# scripts/llm_client.py — provider detection order:
-1. OLLAMA_BASE_URL env var  →  OpenAI-compatible (Ollama, LM Studio, Groq, etc.)
-2. ANTHROPIC_BASE_URL env var  →  OpenAI-compatible (routes through ANTHROPIC_BASE_URL)
-3. else  →  Anthropic direct (requires ANTHROPIC_API_KEY)
-```
-
-Provider detection is automatic. Set one environment variable and the right client kicks in.
-
-| Provider | Env vars needed | SDK |
-|----------|----------------|-----|
-| Ollama | `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | `openai` |
-| Anthropic direct | `ANTHROPIC_API_KEY` | `anthropic` |
-| Groq | `OLLAMA_BASE_URL`, `OLLAMA_API_KEY`, `OLLAMA_MODEL` | `openai` |
-| LM Studio | `OLLAMA_BASE_URL` (localhost), `OLLAMA_MODEL` | `openai` |
-| OpenAI direct | `ANTHROPIC_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_API_KEY` | `openai` |
-
----
 
 ## Validation Rules
 
@@ -436,16 +375,15 @@ wiki triage --json
 wiki scaffold "Product Strategy" --type concept
 wiki draft brief --topic "Agentic UX Strategy" --json
 
-# Persist a synthesized answer as a new wiki page
+# Persist last query context as a new draft page
 wiki save-answer "Agentic AI Product Strategy — 2026 Synthesis" --type concept
 ```
 
 For agents and CLIs that already have their own model, prefer `wiki agent-ingest` for new sources and `wiki pack --json` for existing knowledge. These commands return source metadata, merge candidates, relevant pages, citation-backed claims, graph relationships, health status, stale pages, missing pages, contradictions, and suggested next actions without requiring any provider credentials.
 
-Use `wiki query` when you explicitly want the wiki to call a configured model and synthesize an answer:
+Use `wiki query` when you want graph-traversed context assembled for the active agent:
 
 ```bash
-wiki query "What's the current state of agentic AI product strategy?" --depth 2
 wiki query "What is agentic AI?" --depth 2 --context-only
 wiki query "What is agentic AI?" --expand-only
 ```
@@ -454,10 +392,9 @@ The `wiki query` command:
 1. Scores all pages by keyword overlap with the query
 2. BFS traversal from seed pages through typed edges
 3. Assembles a context block (max 50K chars)
-4. Calls the configured LLM to synthesize a structured answer with citations
-5. Saves the answer to `_last_query.json` for `save-answer` to persist
+4. Saves the context to `_last_query.json` for `save-answer` to persist
 
-The compounding loop: ingest → query → synthesize → save → the wiki grows richer with every cycle.
+The compounding loop: ingest → query → save → the wiki grows richer with every cycle.
 
 ---
 
@@ -468,21 +405,10 @@ python-frontmatter>=1.1.0    # YAML frontmatter parsing
 pyyaml>=6.0                  # SCHEMA.yaml loading
 rich>=13.9                   # Terminal formatting
 pymupdf>=1.25.0              # PDF reading
-
-# Optional (choose one or both):
-openai>=1.0                  # Ollama + OpenAI-compatible APIs
-anthropic>=0.96              # Anthropic Claude direct
 ```
 
 ```bash
-# Core only
 pip install -r requirements.txt
-
-# With Ollama support
-pip install -r requirements.txt openai
-
-# With Anthropic support
-pip install -r requirements.txt anthropic
 ```
 
 ---
@@ -490,7 +416,8 @@ pip install -r requirements.txt anthropic
 ## Test Suite
 
 ```bash
+pip install -r requirements-dev.txt
 python -m pytest tests/ -v
 ```
 
-14 test modules covering every pipeline stage: schema loading, frontmatter validation, wikilink parsing, provenance tracking, graph building, lint checks, query traversal, CLI commands, and full pipeline integration.
+Tests cover every pipeline stage: schema loading, frontmatter validation, wikilink parsing, provenance tracking, graph building, lint checks, query traversal, CLI commands, and pipeline integration.

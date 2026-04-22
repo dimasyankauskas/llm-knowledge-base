@@ -25,7 +25,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from lint import LintIssue
-from utils import WIKI_DIR, SOURCES_DIR, GRAPH_PATH, list_wiki_pages, read_provenance, read_page, page_exists
+from utils import (
+    WIKI_DIR,
+    SOURCES_DIR,
+    GRAPH_PATH,
+    list_wiki_pages,
+    list_concept_pages,
+    list_entity_pages,
+    load_manifest,
+    read_provenance,
+    read_page,
+    page_exists,
+)
 from schema import load_schema
 from extract import register_source, check_dedup, classify_source_type
 from validate import validate_draft, promote_draft
@@ -40,10 +51,9 @@ from recheck_scheduler import (
 )
 from lint import lint
 from consolidate import find_duplicate_pages, generate_indexes, generate_timelines
-from query import find_seed_pages, traverse_typed_graph, build_context
+from query import find_seed_pages, traverse_typed_graph, build_context, expand_query, index_boost, search_sources
 from state import generate_state, generate_health, save_state, save_health, load_state, load_health
 from log import append_log
-from auto_ingest import auto_ingest as run_auto_ingest
 from substrate import (
     build_agent_ingest_plan,
     build_context_pack,
@@ -53,8 +63,6 @@ from substrate import (
     scaffold_page,
 )
 from quality import page_quality, source_coverage
-
-DEFAULT_PAGE_TYPE = "concept"
 
 
 def _lint_issues_to_dicts(issues: list[LintIssue]) -> list[dict]:
@@ -67,19 +75,16 @@ def _lint_issues_to_dicts(issues: list[LintIssue]) -> list[dict]:
 
 def cmd_ingest(args):
     """Full pipeline: extract → validate → link → lint → state.
-
-    With --auto: run LLM-powered auto-ingest instead.
     """
-    if getattr(args, "auto", False):
-        cmd_auto_ingest(args)
-        return
-
     source = Path(args.source)
     source_type = args.type or classify_source_type(source)
 
     # Extract
     dest = register_source(source, source_type=source_type)
-    print(f"Registered: {dest}")
+    if dest is None:
+        print("Duplicate: source already registered")
+    else:
+        print(f"Registered: {dest.get('filename')}")
 
     # Link
     schema = load_schema()
@@ -101,51 +106,10 @@ def cmd_ingest(args):
     # Log
     append_log("ingest", f"Source: {source.name}", {
         "Type": source_type,
-        "Destination": str(dest),
+        "Destination": (dest.get("filename") if isinstance(dest, dict) else "duplicate"),
         "Graph": f"{graph.get('node_count', 0)} nodes, {graph.get('edge_count', 0)} edges",
         "Lint": f"{errors} errors, {warnings} warnings",
     })
-
-
-def cmd_auto_ingest(args):
-    """LLM-powered auto-ingest: read source → generate page → validate → promote."""
-    source = Path(args.source)
-    page_type = args.type or DEFAULT_PAGE_TYPE
-    retry_on_error = not (args.no_retry or args.fast)
-    extraction_mode = getattr(args, "mode", "standard")
-
-    print(f"\n{'='*60}")
-    print(f"  Auto-ingest: {source.name}")
-    if extraction_mode == "gap":
-        print(f"  Mode: gap-driven (InfraNodus-style)")
-    print(f"{'='*60}\n")
-
-    promoted = run_auto_ingest(
-        source_path=source,
-        page_type=page_type,
-        verbose=True,
-        retry_on_error=retry_on_error,
-        extraction_mode=extraction_mode,
-    )
-
-    # Post-auto-ingest: rebuild graph + lint + state
-    schema = load_schema()
-    graph = build_typed_graph(schema=schema)
-    save_graph(graph)
-
-    issues = lint()
-    errors = sum(1 for i in issues if i.severity == "ERROR")
-    warnings = sum(1 for i in issues if i.severity == "WARNING")
-    print(f"\nLint: {errors} errors, {warnings} warnings")
-
-    state = generate_state()
-    save_state(state)
-    health = generate_health(lint_results=_lint_issues_to_dicts(issues))
-    save_health(health)
-
-    print(f"\n{'='*60}")
-    print(f"  Promoted: {len(promoted)} page(s)")
-    print(f"{'='*60}")
 
 
 def cmd_extract(args):
@@ -153,7 +117,10 @@ def cmd_extract(args):
     source = Path(args.source)
     source_type = args.type or classify_source_type(source)
     dest = register_source(source, source_type=source_type)
-    print(f"Registered: {dest}")
+    if dest is None:
+        print("Duplicate: source already registered")
+    else:
+        print(f"Registered: {dest.get('filename')}")
 
 
 def cmd_validate(args):
@@ -299,12 +266,40 @@ def cmd_health(args):
 
 
 def cmd_query(args):
-    """Graph traversal query with LLM synthesis."""
-    from query import synthesize_answer, expand_query, index_boost
+    """Graph traversal query (context-first; no model calls)."""
+    # Treat "empty" as no concept/entity pages (indexes/metadata don't count).
+    has_pages = bool(list_concept_pages() or list_entity_pages())
 
-    pages = list_wiki_pages()
-    if not pages:
-        print("Wiki is empty. Ingest some sources first.")
+    if not has_pages:
+        manifest = load_manifest()
+        results = search_sources(args.question, manifest=manifest, top_k=args.top_k)
+        if getattr(args, "json", False):
+            print(json.dumps(
+                {
+                    "question": args.question,
+                    "mode": "sources-only",
+                    "results": results,
+                },
+                indent=2,
+                ensure_ascii=False,
+            ))
+            return
+
+        if not results:
+            sources = manifest.get("sources", []) if isinstance(manifest, dict) else []
+            if sources:
+                print("No concept/entity pages yet. Registered sources exist, but no text matches were found.")
+                print("Try different terms, or create pages with `wiki agent-ingest`.")
+            else:
+                print("Wiki is empty. Ingest some sources first.")
+            return
+
+        print("No concept/entity pages yet. Showing top matching source excerpts:\n")
+        for item in results:
+            print(f"== {item['filename']} ({item.get('source_type', 'unknown')}) ==")
+            for snippet in item.get("snippets", [])[:5]:
+                print(snippet.rstrip())
+            print()
         return
 
     # Query expansion
@@ -341,23 +336,14 @@ def cmd_query(args):
     traversed = traverse_typed_graph(seed, graph, args.depth)
     context = build_context(traversed)
 
-    # LLM synthesis (unless --json or --context-only)
-    answer = None
     if not getattr(args, "json", False) and not getattr(args, "context_only", False):
         print(f"\n🔍 Question: {args.question}")
         if len(queries) > 1:
             print(f"📝 Expanded: {', '.join(queries[1:])}")
         print(f"📄 Seed pages: {', '.join(p.stem for p in seed)}")
         print(f"🔗 Traversed: {len(traversed)} pages (depth={args.depth})")
-        print(f"📝 Context: {len(context):,} chars")
-        print(f"🧠 Synthesizing answer...\n")
-        try:
-            answer = synthesize_answer(args.question, context)
-            print(answer)
-        except Exception as e:
-            print(f"⚠️  LLM synthesis failed: {e}")
-            print("Falling back to raw context:\n")
-            print(context)
+        print(f"📝 Context: {len(context):,} chars\n")
+        print(context)
 
     if getattr(args, "json", False):
         output = {
@@ -370,7 +356,7 @@ def cmd_query(args):
             ],
             "context_chars": len(context),
             "context": context,
-            "answer": answer,
+            "answer": None,
         }
         print(json.dumps(output, indent=2, ensure_ascii=False))
 
@@ -385,7 +371,7 @@ def cmd_query(args):
         "seed_pages": [p.stem for p in seed],
         "traversed_pages": [{"page": r["page"].stem, "score": r["score"]} for r in traversed],
         "context": context,
-        "answer": answer,
+        "answer": None,
     }
     (WIKI_DIR / "_last_query.json").write_text(
         json.dumps(last_query, indent=2, ensure_ascii=False), encoding="utf-8",
@@ -397,12 +383,12 @@ def cmd_query(args):
         "Expanded": len(queries) > 1,
         "Traversed": f"{len(traversed)} pages",
         "Context": f"{len(context):,} chars",
-        "Synthesized": "yes" if answer else "no",
+        "Synthesized": "no",
     })
 
 
 def cmd_pack(args):
-    """Build an agent-readable context pack without LLM synthesis."""
+    """Build an agent-readable context pack (no model calls)."""
     pack = build_context_pack(args.query, depth=args.depth, top_k=args.top_k)
     if args.json:
         print(json.dumps(pack, indent=2, ensure_ascii=False))
@@ -429,24 +415,26 @@ def cmd_agent_ingest(args):
     """Create a model-free ingestion plan for the active CLI agent."""
     source = Path(args.source)
     source_type = args.type or classify_source_type(source)
-    registered_path = None
+    registered = None
     if not args.no_register:
-        registered_path = register_source(source, source_type=source_type)
+        registered = register_source(source, source_type=source_type)
 
     plan = build_agent_ingest_plan(
         source,
         source_type=source_type,
         max_candidates=args.max_candidates,
     )
-    if registered_path:
-        plan["registered_source"] = str(registered_path)
+    if isinstance(registered, dict):
+        plan["registered_source"] = registered.get("filename")
 
     if args.json:
         print(json.dumps(plan, indent=2, ensure_ascii=False))
         return
 
-    if registered_path:
-        print(f"Registered source: {registered_path}\n")
+    if registered is None and not args.no_register:
+        print("Duplicate: source already registered\n")
+    elif isinstance(registered, dict):
+        print(f"Registered source: {registered.get('filename')}\n")
     print(render_agent_ingest_plan(plan))
 
 
@@ -604,7 +592,10 @@ def cmd_register(args):
     source = Path(args.source)
     source_type = args.type or classify_source_type(source)
     dest = register_source(source, source_type=source_type)
-    print(f"Registered: {dest}")
+    if dest is None:
+        print("Duplicate: source already registered")
+    else:
+        print(f"Registered: {dest.get('filename')}")
 
 
 def cmd_check(args):
@@ -694,7 +685,7 @@ def cmd_save_answer(args):
     traversed_stems = [p["page"] for p in lq.get("traversed_pages", [])]
     source_refs = [f"[source: wiki query, §{stem}]" for stem in traversed_stems[:5]]
 
-    # Use LLM-synthesized answer if available, otherwise fall back to context
+    # Prefer a previously saved answer if present; otherwise fall back to context.
     answer = lq.get("answer", "")
 
     lines = []
@@ -868,20 +859,15 @@ def build_parser():
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # ingest
-    p_ingest = subparsers.add_parser("ingest", help="Full pipeline: extract → validate → link → lint → state")
+    p_ingest = subparsers.add_parser("ingest", help="Full pipeline: extract → link → lint → state")
     p_ingest.add_argument("source", help="Source file path")
     p_ingest.add_argument("--type", help="Source type (paper, article, transcript, code-doc)")
-    p_ingest.add_argument("--auto", action="store_true", help="Run LLM-powered auto-ingest (no manual collaboration required)")
-    p_ingest.add_argument("--no-retry", action="store_true", help="Skip retry loop on validation errors (trust first-pass output)")
-    p_ingest.add_argument("--fast", action="store_true", help="Alias for --no-retry (fast extraction without correction)")
-    p_ingest.add_argument("--mode", default="standard", choices=["standard", "gap"], help="Extraction mode: standard (full summary) or gap (fill gaps only)")
     p_ingest.set_defaults(func=cmd_ingest)
 
     # process (alias for ingest)
     p_process = subparsers.add_parser("process", help="Alias for ingest")
     p_process.add_argument("source", help="Source file path")
     p_process.add_argument("--type", help="Source type")
-    p_process.add_argument("--auto", action="store_true", help="Run LLM-powered auto-ingest")
     p_process.set_defaults(func=cmd_ingest)
 
     # extract
@@ -920,12 +906,12 @@ def build_parser():
     p_health.set_defaults(func=cmd_health)
 
     # query
-    p_query = subparsers.add_parser("query", help="Graph traversal query with LLM synthesis")
+    p_query = subparsers.add_parser("query", help="Graph traversal query (context-first; no model calls)")
     p_query.add_argument("question", help="Question to find context for")
     p_query.add_argument("--depth", type=int, default=2, help="Traversal depth (default: 2)")
     p_query.add_argument("--top-k", type=int, default=5, help="Number of seed pages")
     p_query.add_argument("--json", action="store_true", help="Output as JSON")
-    p_query.add_argument("--context-only", action="store_true", help="Output raw context without LLM synthesis")
+    p_query.add_argument("--context-only", action="store_true", help="Output raw context only (default behavior)")
     p_query.add_argument("--no-expand", action="store_true", help="Skip query expansion (keyword-only)")
     p_query.add_argument("--expand-only", action="store_true", help="Show expanded queries without running pipeline")
     p_query.set_defaults(func=cmd_query)
